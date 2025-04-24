@@ -23,6 +23,7 @@ class Whiteboard:
         # Create UI elements if controls are shown
         self.ui_elements = []
         self.active_dialog = None
+        self.eraser_button = None  # Track eraser button separately
         
         if show_controls:
             self._setup_ui()
@@ -32,16 +33,19 @@ class Whiteboard:
         x, y = self.pos
         width, height = self.size
         
+        # Get scaled dimensions
+        scaled_font_sizes = Config.get_scaled_font_sizes()
+        
         # UI Control panel at the top
-        ui_height = 50
+        ui_height = Config.scale_height(50)
         ui_width = width
         ui_x = x
         ui_y = y - ui_height
         
         # Calculate button positions
-        button_width = 100
-        button_height = 40
-        spacing = 10
+        button_width = Config.scale_width(100)
+        button_height = Config.scale_height(40)
+        spacing = Config.scale_width(10)
         
         # Color selection buttons
         color_names = ["Black", "Red", "Blue"]
@@ -51,13 +55,14 @@ class Whiteboard:
         for i, (color_name, color) in enumerate(zip(color_names, colors)):
             button = Button(
                 color_x + (button_width + spacing) * i,
-                ui_y + 5,
+                ui_y + Config.scale_height(5),
                 button_width,
                 button_height,
                 color_name,
                 lambda idx=i: self.set_color(idx),
                 bg_color=color,
-                text_color=Config.WHITE if color == Config.BLACK else Config.BLACK
+                text_color=Config.WHITE if color == Config.BLACK else Config.BLACK,
+                font_size=scaled_font_sizes['small']
             )
             self.ui_elements.append(button)
             
@@ -68,52 +73,63 @@ class Whiteboard:
         for i, label in enumerate(size_labels):
             button = Button(
                 size_x + (button_width + spacing) * i,
-                ui_y + 5,
+                ui_y + Config.scale_height(5),
                 button_width,
                 button_height,
                 label,
-                lambda idx=i: self.set_brush_size(idx)
+                lambda idx=i: self.set_brush_size(idx),
+                font_size=scaled_font_sizes['small']
             )
             self.ui_elements.append(button)
             
         # Action buttons (Eraser, Clear, Save)
         action_x = size_x + (button_width + spacing) * 3 + spacing
         
-        # Eraser button
-        eraser_button = Button(
+        # Eraser button - store reference to update its visual state
+        self.eraser_button = Button(
             action_x,
-            ui_y + 5,
+            ui_y + Config.scale_height(5),
             button_width,
             button_height,
             "Eraser",
-            self.toggle_eraser
+            self.toggle_eraser,
+            bg_color=Config.LIGHT_GRAY,
+            hover_color=Config.GRAY,
+            font_size=scaled_font_sizes['small']
         )
-        self.ui_elements.append(eraser_button)
+        self.ui_elements.append(self.eraser_button)
         
         # Clear button
         clear_button = Button(
             action_x + button_width + spacing,
-            ui_y + 5,
+            ui_y + Config.scale_height(5),
             button_width,
             button_height,
             "Clear",
-            self.clear_canvas
+            self.clear_canvas,
+            font_size=scaled_font_sizes['small']
         )
         self.ui_elements.append(clear_button)
         
         # Save button
         save_button = Button(
             action_x + (button_width + spacing) * 2,
-            ui_y + 5,
+            ui_y + Config.scale_height(5),
             button_width,
             button_height,
             "Save",
-            self.save_canvas
+            self.save_canvas,
+            font_size=scaled_font_sizes['small']
         )
         self.ui_elements.append(save_button)
             
     def handle_event(self, event):
         """Handle pygame events"""
+        # Check for resize events
+        if event.type == pygame.VIDEORESIZE:
+            self._resize()
+            return True
+            
         # Handle UI events if controls are shown
         if self.show_controls:
             # First handle any active dialogs
@@ -186,6 +202,10 @@ class Whiteboard:
     def set_color(self, color_index):
         """Set the current brush color"""
         self.drawing_engine.set_brush_color(color_index)
+        # Turn off eraser mode when selecting a color
+        if self.eraser_button and self.drawing_engine.eraser_mode:
+            self.drawing_engine.eraser_mode = False
+            self.eraser_button.bg_color = Config.LIGHT_GRAY
         
     def set_brush_size(self, size_index):
         """Set the current brush size"""
@@ -194,6 +214,17 @@ class Whiteboard:
     def toggle_eraser(self):
         """Toggle eraser mode"""
         self.drawing_engine.toggle_eraser()
+        
+        # Update eraser button appearance based on mode
+        if self.eraser_button:
+            if self.drawing_engine.eraser_mode:
+                # Eraser is active
+                self.eraser_button.bg_color = Config.GRAY
+                self.eraser_button.hover_color = Config.DARK_GRAY
+            else:
+                # Eraser is inactive
+                self.eraser_button.bg_color = Config.LIGHT_GRAY
+                self.eraser_button.hover_color = Config.GRAY
         
     def clear_canvas(self):
         """Clear the canvas with confirmation dialog"""
@@ -212,9 +243,12 @@ class Whiteboard:
             
         self.active_dialog = Dialog(
             self.screen,
-            "Are you sure you want to clear the canvas?",
+            "You will lose your current drawing.\nDo you want to continue?",
             confirm_clear,
-            cancel_clear
+            cancel_clear,
+            title="Clear Canvas",
+            confirm_text="Clear",
+            cancel_text="Cancel"
         )
         
     def save_canvas(self):
@@ -235,9 +269,11 @@ class Whiteboard:
             
         self.active_dialog = Dialog(
             self.screen,
-            f"Drawing saved as:\n{filename}",
+            f"Your drawing was saved successfully as:\n{filename}",
             close_dialog,
-            None
+            None,
+            title="Save Successful",
+            confirm_text="OK"
         )
         
     def has_content(self):
@@ -249,4 +285,13 @@ class Whiteboard:
             for y in range(0, self.size[1], 10):
                 if self.drawing_engine.surface.get_at((x, y)) != self.drawing_engine.bg_color:
                     return True
-        return False 
+        return False
+    
+    def _resize(self):
+        """Handle window resize by recreating the UI elements"""
+        # Clear existing UI elements
+        self.ui_elements = []
+        
+        # Recreate UI if controls are shown
+        if self.show_controls:
+            self._setup_ui() 

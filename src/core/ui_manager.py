@@ -6,7 +6,7 @@ class Button:
     """A clickable button with hover effects"""
     def __init__(self, x, y, width, height, text, callback=None, font_size=None, 
                  bg_color=Config.LIGHT_GRAY, hover_color=Config.GRAY, text_color=Config.BLACK,
-                 disabled=False):
+                 disabled=False, rounded=True, border_radius=10):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.callback = callback
@@ -16,6 +16,8 @@ class Button:
         self.text_color = text_color
         self.disabled = disabled
         self.hovered = False
+        self.rounded = rounded
+        self.border_radius = border_radius
         
     def draw(self, surface):
         """Draw the button on the given surface"""
@@ -28,8 +30,14 @@ class Button:
             color = self.bg_color
             
         # Draw button background
-        pygame.draw.rect(surface, color, self.rect)
-        pygame.draw.rect(surface, Config.BLACK, self.rect, 2)  # Border
+        if self.rounded:
+            # Draw rounded rectangle
+            pygame.draw.rect(surface, color, self.rect, border_radius=self.border_radius)
+            pygame.draw.rect(surface, Config.BLACK, self.rect, 2, border_radius=self.border_radius)
+        else:
+            # Draw regular rectangle
+            pygame.draw.rect(surface, color, self.rect)
+            pygame.draw.rect(surface, Config.BLACK, self.rect, 2)
         
         # Draw button text
         font = pygame.font.SysFont(None, self.font_size)
@@ -76,29 +84,33 @@ class Label:
         
 class Dialog:
     """A dialog box with message and confirm/cancel buttons"""
-    def __init__(self, screen, message, confirm_callback=None, cancel_callback=None):
+    def __init__(self, screen, message, confirm_callback=None, cancel_callback=None, 
+                 title="Confirmation", confirm_text="Yes", cancel_text="No"):
         self.screen = screen
         self.message = message
+        self.title = title
         self.confirm_callback = confirm_callback
         self.cancel_callback = cancel_callback
         
         # Create dialog rectangle
-        width, height = 400, 200
+        width, height = 500, 250
         screen_width, screen_height = screen.get_size()
         x = (screen_width - width) // 2
         y = (screen_height - height) // 2
         self.rect = pygame.Rect(x, y, width, height)
         
-        # Create buttons
+        # Create buttons with improved styling
         button_y = y + height - 70
         self.confirm_button = Button(
             x + width//4 - Config.BUTTON_WIDTH//2, 
             button_y,
             Config.BUTTON_WIDTH//2, 
             Config.BUTTON_HEIGHT//2,
-            "Yes", 
+            confirm_text, 
             self.confirm,
-            bg_color=Config.GREEN
+            bg_color=Config.GREEN,
+            hover_color=(100, 200, 100),
+            rounded=True
         )
         
         self.cancel_button = Button(
@@ -106,28 +118,45 @@ class Dialog:
             button_y,
             Config.BUTTON_WIDTH//2,
             Config.BUTTON_HEIGHT//2,
-            "No",
+            cancel_text,
             self.cancel,
-            bg_color=Config.RED
+            bg_color=Config.RED,
+            hover_color=(200, 100, 100),
+            rounded=True
         )
         
     def draw(self):
         """Draw the dialog box"""
         # Draw semi-transparent overlay
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 128))  # Semi-transparent black
+        overlay.fill((0, 0, 0, 160))  # Darker semi-transparent black
         self.screen.blit(overlay, (0, 0))
         
-        # Draw dialog background
-        pygame.draw.rect(self.screen, Config.WHITE, self.rect)
-        pygame.draw.rect(self.screen, Config.BLACK, self.rect, 2)  # Border
+        # Draw dialog background with rounded corners
+        pygame.draw.rect(self.screen, Config.WHITE, self.rect, border_radius=15)
+        pygame.draw.rect(self.screen, Config.BLACK, self.rect, 2, border_radius=15)
+        
+        # Draw title bar
+        title_rect = pygame.Rect(
+            self.rect.x, 
+            self.rect.y, 
+            self.rect.width, 
+            40
+        )
+        pygame.draw.rect(self.screen, Config.BLUE, title_rect, border_top_left_radius=15, border_top_right_radius=15)
+        
+        # Draw title text
+        font = pygame.font.SysFont(None, Config.FONT_MEDIUM)
+        title_surf = font.render(self.title, True, Config.WHITE)
+        title_rect = title_surf.get_rect(center=(self.rect.centerx, self.rect.y + 20))
+        self.screen.blit(title_surf, title_rect)
         
         # Draw message
         font = pygame.font.SysFont(None, Config.FONT_MEDIUM)
         lines = self.message.split('\n')
         for i, line in enumerate(lines):
             text_surf = font.render(line, True, Config.BLACK)
-            text_rect = text_surf.get_rect(center=(self.rect.centerx, self.rect.y + 60 + i * 30))
+            text_rect = text_surf.get_rect(center=(self.rect.centerx, self.rect.y + 90 + i * 30))
             self.screen.blit(text_surf, text_rect)
         
         # Draw buttons
