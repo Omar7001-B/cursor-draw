@@ -33,6 +33,7 @@ class DrawBasicShapes:
         self.accuracy_tracker = AccuracyTracker()
         self.is_tracing = False
         self.shape_completed = False
+        self.auto_progress_timer = None  # Timer for automatic progression
         
         # Set up UI elements
         self._setup_ui()
@@ -48,11 +49,11 @@ class DrawBasicShapes:
         scaled_font_sizes = Config.get_scaled_font_sizes()
         scaled_button_width, scaled_button_height = Config.get_scaled_button_dimensions()
         
-        # Calculate whiteboard position and size
-        # Leave margin at top for UI controls and at bottom for menu button
-        whiteboard_margin_top = Config.scale_height(70)  # Increased for better header spacing
-        whiteboard_margin_bottom = Config.scale_height(70)
-        whiteboard_width = screen_width - Config.scale_width(40) - Config.scale_width(200)  # Make room for accuracy panel
+        # Calculate whiteboard position and size - leave more space for accuracy panel
+        accuracy_panel_width = Config.scale_width(220)  # Increase width for panel
+        whiteboard_margin_top = Config.scale_height(80)  # Increased for better header spacing
+        whiteboard_margin_bottom = Config.scale_height(80)  # Increased for button spacing
+        whiteboard_width = screen_width - Config.scale_width(40) - accuracy_panel_width
         whiteboard_height = screen_height - whiteboard_margin_top - whiteboard_margin_bottom
         whiteboard_x = Config.scale_width(20)
         whiteboard_y = whiteboard_margin_top
@@ -76,12 +77,33 @@ class DrawBasicShapes:
         )
         
         # Header bar
-        self.header_rect = pygame.Rect(0, 0, screen_width, Config.scale_height(50))
+        self.header_rect = pygame.Rect(0, 0, screen_width, Config.scale_height(60))
         
-        # Back to Menu button
+        # Shape name label - position above the whiteboard
+        self.shape_label = Label(
+            whiteboard_x + whiteboard_width // 2,
+            whiteboard_y - Config.scale_height(25),
+            "Circle",  # Will be updated in _generate_current_shape
+            font_size=scaled_font_sizes['medium'],
+            centered=True
+        )
+        
+        # Instruction label - position below the whiteboard with proper spacing
+        self.instruction_label = Label(
+            whiteboard_x + whiteboard_width // 2,
+            whiteboard_y + whiteboard_height + Config.scale_height(15),
+            "Trace the shape as accurately as you can",
+            font_size=scaled_font_sizes['small'],
+            centered=True
+        )
+        
+        # Calculate button positions with proper spacing to avoid overlap
+        button_y = screen_height - Config.scale_height(50)
+        
+        # Back to Menu button - left side
         self.menu_button = Button(
-            Config.scale_width(20),
-            screen_height - Config.scale_height(60),
+            Config.scale_width(30),
+            button_y,
             scaled_button_width,
             scaled_button_height,
             "Back to Menu",
@@ -93,10 +115,11 @@ class DrawBasicShapes:
             font_size=scaled_font_sizes['small']
         )
         
-        # Clear button
+        # Clear button - center left
+        clear_x = whiteboard_x + whiteboard_width // 4 - scaled_button_width // 2
         self.clear_button = Button(
-            whiteboard_x + whiteboard_width // 3 - scaled_button_width // 2,
-            screen_height - Config.scale_height(60),
+            clear_x,
+            button_y,
             scaled_button_width,
             scaled_button_height,
             "Clear",
@@ -108,10 +131,11 @@ class DrawBasicShapes:
             font_size=scaled_font_sizes['small']
         )
         
-        # Next Shape button (initially disabled)
+        # Next Shape button - center right (initially disabled)
+        next_x = whiteboard_x + 3 * whiteboard_width // 4 - scaled_button_width // 2
         self.next_shape_button = Button(
-            whiteboard_x + 2 * whiteboard_width // 3 - scaled_button_width // 2,
-            screen_height - Config.scale_height(60),
+            next_x,
+            button_y,
             scaled_button_width,
             scaled_button_height,
             "Next Shape",
@@ -124,32 +148,14 @@ class DrawBasicShapes:
             disabled=True
         )
         
-        # Shape name label
-        self.shape_label = Label(
-            whiteboard_x + whiteboard_width // 2,
-            whiteboard_y - Config.scale_height(25),
-            "Circle",  # Will be updated in _generate_current_shape
-            font_size=scaled_font_sizes['medium'],
-            centered=True
-        )
-        
-        # Instruction label
-        self.instruction_label = Label(
-            whiteboard_x + whiteboard_width // 2,
-            whiteboard_y + whiteboard_height + Config.scale_height(5),
-            "Trace the shape as accurately as you can",
-            font_size=scaled_font_sizes['small'],
-            centered=True
-        )
-        
         # Calculate accuracy panel position (right side of whiteboard)
         self.accuracy_panel_pos = (
             whiteboard_x + whiteboard_width + Config.scale_width(20),
             whiteboard_y
         )
         self.accuracy_panel_size = (
-            Config.scale_width(180),
-            Config.scale_height(300)
+            accuracy_panel_width,
+            Config.scale_height(320)  # Slightly taller for more information
         )
         
     def _generate_current_shape(self):
@@ -160,6 +166,9 @@ class DrawBasicShapes:
         
         # Get current shape data
         shape_data = self.shapes_data[self.current_shape_index]
+        
+        # Clear the whiteboard first to ensure old drawings and shapes are gone
+        self.whiteboard.drawing_engine.clear_canvas()
         
         # Get whiteboard dimensions
         wb_width, wb_height = self.whiteboard.size
@@ -186,9 +195,7 @@ class DrawBasicShapes:
         self.is_tracing = False
         self.shape_completed = False
         self.next_shape_button.disabled = True
-        
-        # Clear the whiteboard
-        self.whiteboard.drawing_engine.clear_canvas()
+        self.auto_progress_timer = None
         
     def _back_to_menu_with_check(self):
         """Return to main menu with confirmation if needed"""
@@ -221,6 +228,15 @@ class DrawBasicShapes:
         self.drawn_points = []
         self.is_tracing = False
         self.next_shape_button.disabled = not self.shape_completed
+        
+        # Redraw the shape outline
+        PathDetection.draw_shape_outline(
+            self.whiteboard.drawing_engine.surface,
+            self.current_shape_points,
+            Config.BLUE,
+            width=4,
+            alpha=100
+        )
     
     def _next_shape(self):
         """Proceed to the next shape"""
@@ -228,8 +244,13 @@ class DrawBasicShapes:
             self.current_shape_index += 1
             self._generate_current_shape()
     
-    def _evaluate_tracing(self):
-        """Evaluate the tracing accuracy and update metrics"""
+    def _evaluate_tracing(self, is_final=False):
+        """
+        Evaluate the tracing accuracy and update metrics
+        
+        Args:
+            is_final: Whether this is the final evaluation after drawing is complete
+        """
         if len(self.drawn_points) < 5:
             # Not enough data to evaluate
             return
@@ -244,25 +265,29 @@ class DrawBasicShapes:
         # Update accuracy tracker
         self.accuracy_tracker.update_metrics(metrics)
         
-        # Enable next shape button if completed
-        if self.accuracy_tracker.is_completed() and not self.shape_completed:
-            self.shape_completed = True
-            self.next_shape_button.disabled = False
-            
-            # Show completion dialog
-            def close_dialog():
-                self.active_dialog = None
+        # For final evaluation (when drawing is complete)
+        if is_final:
+            # Enable next shape button if completed
+            if self.accuracy_tracker.is_completed() and not self.shape_completed:
+                self.shape_completed = True
+                self.next_shape_button.disabled = False
                 
-            self.active_dialog = Dialog(
-                self.screen,
-                f"Great job! You completed the {self.shapes_data[self.current_shape_index]['name']}.\n" +
-                f"Accuracy: {metrics['percentage']:.1f}%\n" +
-                "Click Next Shape to continue.",
-                close_dialog,
-                None,
-                title="Shape Completed!",
-                confirm_text="OK"
-            )
+                # Show completion dialog
+                def close_dialog():
+                    self.active_dialog = None
+                    # Set timer for auto-progression (3 seconds)
+                    self.auto_progress_timer = pygame.time.get_ticks() + 3000
+                    
+                self.active_dialog = Dialog(
+                    self.screen,
+                    f"Great job! You completed the {self.shapes_data[self.current_shape_index]['name']}.\n" +
+                    f"Accuracy: {metrics['percentage']:.1f}%\n" +
+                    "Moving to next shape in 3 seconds...",
+                    close_dialog,
+                    None,
+                    title="Shape Completed!",
+                    confirm_text="OK"
+                )
             
     def handle_event(self, event):
         """Handle pygame events"""
@@ -317,6 +342,9 @@ class DrawBasicShapes:
                 self.whiteboard.drawing_engine.draw_to(canvas_pos)
                 self.drawn_points.append(canvas_pos)  # Track point for accuracy
                 
+                # Update accuracy metrics in real-time as user draws
+                self._evaluate_tracing(is_final=False)
+                
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:  # Left release
             if self.whiteboard.drawing_engine.is_drawing:
                 self.whiteboard.drawing_engine.stop_drawing()
@@ -324,7 +352,7 @@ class DrawBasicShapes:
                 
                 # Evaluate the tracing if we have drawn points
                 if len(self.drawn_points) > 0:
-                    self._evaluate_tracing()
+                    self._evaluate_tracing(is_final=True)
         
     def update(self, mouse_pos=None):
         """Update game state"""
@@ -337,6 +365,11 @@ class DrawBasicShapes:
         # Update dialog if active
         if self.active_dialog and mouse_pos:
             self.active_dialog.update(mouse_pos)
+            
+        # Check for auto-progression timer
+        if self.auto_progress_timer and pygame.time.get_ticks() > self.auto_progress_timer:
+            self.auto_progress_timer = None
+            self._next_shape()  # Automatically progress to next shape
             
         # Return next screen if set
         if self.next_screen:
@@ -382,7 +415,8 @@ class DrawBasicShapes:
         self.accuracy_tracker.draw_accuracy_panel(
             self.screen,
             self.accuracy_panel_pos,
-            self.accuracy_panel_size
+            self.accuracy_panel_size,
+            show_details=True
         )
         
         # Draw buttons
