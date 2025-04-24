@@ -228,14 +228,54 @@ class Whiteboard:
         
     def clear_canvas(self):
         """Clear the canvas with confirmation dialog"""
-        if self.drawing_engine.surface.get_at((0, 0)) == self.drawing_engine.surface.get_at((self.size[0]-1, self.size[1]-1)) == self.drawing_engine.bg_color:
-            # Canvas is already clear, no need for dialog
+        # Check if canvas is empty by sampling key points
+        empty = True
+        for x in range(0, self.size[0], 50):  # Sample fewer points for efficiency
+            for y in range(0, self.size[1], 50):
+                try:
+                    if self.drawing_engine.surface.get_at((x, y)) != self.drawing_engine.bg_color:
+                        empty = False
+                        break
+                except IndexError:
+                    # Skip out of bounds coordinates
+                    continue
+            if not empty:
+                break
+                
+        if empty:
+            # Canvas is already clear, provide feedback
+            def close_feedback():
+                self.active_dialog = None
+                
+            self.active_dialog = Dialog(
+                self.screen,
+                "Canvas is already clear.",
+                close_feedback,
+                None,
+                title="Information",
+                confirm_text="OK"
+            )
             return
             
         def confirm_clear():
+            # Show "Clearing..." indicator
+            clearing_dialog = Dialog(
+                self.screen,
+                "Clearing canvas...",
+                None,
+                None,
+                title="Please Wait"
+            )
+            clearing_dialog.draw()
+            pygame.display.flip()
+            
             # Clear animation
-            for _ in self.drawing_engine.clear_canvas(animated=True):
-                pass  # We could render the animation frames here if needed
+            for frame in self.drawing_engine.clear_canvas(animated=True):
+                # Update the screen with each animation frame
+                self.screen.blit(frame, self.pos)
+                pygame.display.update(pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1]))
+                pygame.time.delay(10)  # Slightly faster animation
+                
             self.active_dialog = None
             
         def cancel_clear():

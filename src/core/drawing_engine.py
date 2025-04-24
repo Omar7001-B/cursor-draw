@@ -1,5 +1,7 @@
 import pygame
 import math
+import numpy as np
+from typing import List, Tuple, Optional, Dict, Any, Generator
 from src.config import Config
 
 class DrawingEngine:
@@ -28,6 +30,9 @@ class DrawingEngine:
         self.history = [pygame.Surface.copy(self.surface)]
         self.history_index = 0
         self.max_history = 10
+        
+        # Initialize strokes list
+        self.strokes = []
         
     @property
     def brush_size(self):
@@ -61,21 +66,56 @@ class DrawingEngine:
             self._add_to_history()
             
     def clear_canvas(self, animated=False):
-        """Clear the canvas, with optional animation effect"""
-        if animated:
-            # Perform clearing animation
-            clear_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            for alpha in range(0, 256, 15):
-                clear_surf.fill((self.bg_color[0], self.bg_color[1], self.bg_color[2], alpha))
-                temp_surf = self.surface.copy()
-                temp_surf.blit(clear_surf, (0, 0))
-                # Signal that this is an animation frame, not final state
-                yield temp_surf
-                pygame.time.delay(20)
+        """
+        Clear the canvas.
         
-        # Finally, clear the actual canvas
+        Args:
+            animated (bool): Whether to clear with animation effect
+            
+        Returns:
+            Generator yielding animation frames if animated=True
+        """
+        if animated:
+            # Create a copy of the current surface for the animation
+            animation_surface = self.surface.copy()
+            
+            # Create a temporary surface for the animation
+            temp_surface = pygame.Surface(self.surface.get_size(), pygame.SRCALPHA)
+            temp_surface.fill(self.bg_color)
+            
+            # Animation parameters
+            steps = 15  # Reduced number of steps for faster animation
+            radius_start = 10
+            max_radius = int(math.sqrt(self.surface.get_width()**2 + self.surface.get_height()**2))
+            
+            # Get center of the surface
+            center = (self.surface.get_width() // 2, self.surface.get_height() // 2)
+            
+            # Perform circular wipe animation
+            for i in range(steps):
+                # Calculate current radius
+                radius = int(radius_start + (max_radius - radius_start) * (i / (steps - 1)))
+                
+                # Create a frame
+                frame = animation_surface.copy()
+                
+                # Draw the clearing circle
+                pygame.draw.circle(frame, self.bg_color, center, radius)
+                
+                # Yield the current frame
+                yield frame
+            
+            # Final frame (completely clear)
+            final_frame = pygame.Surface(self.surface.get_size(), pygame.SRCALPHA)
+            final_frame.fill(self.bg_color)
+            yield final_frame
+        
+        # Clear the actual canvas
         self.surface.fill(self.bg_color)
+        
+        # Restart stroke history and record this as the first state
         self._add_to_history()
+        self.strokes = []
         
     def set_brush_size(self, size_index):
         """Set the brush size by index"""
