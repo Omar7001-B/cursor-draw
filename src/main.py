@@ -17,9 +17,22 @@ def main():
     # Initialize pygame
     pygame.init()
     
+    # Get the screen info to ensure our window fits within screen boundaries
+    screen_info = pygame.display.Info()
+    available_width = screen_info.current_w
+    available_height = screen_info.current_h
+    
+    # Adjust initial window size if necessary to fit screen
+    window_width = min(Config.SCREEN_WIDTH, available_width - 50)  # Leave some margin
+    window_height = min(Config.SCREEN_HEIGHT, available_height - 50)  # Leave some margin for window controls
+    
+    # Update Config to reflect the adjusted size
+    Config.SCREEN_WIDTH = window_width
+    Config.SCREEN_HEIGHT = window_height
+    
     # Set up the game window with resizable flag
     screen = pygame.display.set_mode(
-        (Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT),
+        (window_width, window_height),
         pygame.RESIZABLE
     )
     pygame.display.set_caption("CursorDraw")
@@ -43,11 +56,18 @@ def main():
             elif event.type == VIDEORESIZE:
                 # Handle window resize event
                 width, height = event.size
+                
+                # Ensure the window doesn't exceed screen boundaries
+                width = min(width, available_width - 50)
+                height = min(height, available_height - 50)
+                
                 # Update the Config values to reflect the new size
                 Config.SCREEN_WIDTH = width
                 Config.SCREEN_HEIGHT = height
+                
                 # Recreate the display surface with the new size
                 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+                
                 # Recreate the current screen with the new surface
                 if isinstance(current_screen, MainMenu):
                     current_screen = MainMenu(screen, game_state)
