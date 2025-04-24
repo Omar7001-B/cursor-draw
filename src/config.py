@@ -4,6 +4,10 @@ class Config:
     SCREEN_HEIGHT = 768
     FPS = 60
     
+    # Base dimensions for relative calculations
+    BASE_WIDTH = 1024
+    BASE_HEIGHT = 768
+    
     # Colors
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -41,4 +45,38 @@ class Config:
         "Trace the Number",
         "Trace the Sentence",
         "Whiteboard to Text"
-    ] 
+    ]
+    
+    @classmethod
+    def scale_width(cls, width):
+        """Scale a width value based on current screen width"""
+        return int(width * cls.SCREEN_WIDTH / cls.BASE_WIDTH)
+    
+    @classmethod
+    def scale_height(cls, height):
+        """Scale a height value based on current screen height"""
+        return int(height * cls.SCREEN_HEIGHT / cls.BASE_HEIGHT)
+    
+    @classmethod
+    def scale_font(cls, size):
+        """Scale a font size based on screen dimensions"""
+        # Use the smaller of the two scale factors to ensure text fits
+        scale_factor = min(cls.SCREEN_WIDTH / cls.BASE_WIDTH, cls.SCREEN_HEIGHT / cls.BASE_HEIGHT)
+        return int(size * scale_factor)
+    
+    @classmethod
+    def get_scaled_button_dimensions(cls):
+        """Get scaled button dimensions"""
+        return (
+            cls.scale_width(cls.BUTTON_WIDTH),
+            cls.scale_height(cls.BUTTON_HEIGHT)
+        )
+    
+    @classmethod
+    def get_scaled_font_sizes(cls):
+        """Get scaled font sizes"""
+        return {
+            'small': cls.scale_font(cls.FONT_SMALL),
+            'medium': cls.scale_font(cls.FONT_MEDIUM),
+            'large': cls.scale_font(cls.FONT_LARGE)
+        } 

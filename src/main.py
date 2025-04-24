@@ -17,8 +17,11 @@ def main():
     # Initialize pygame
     pygame.init()
     
-    # Set up the game window
-    screen = pygame.display.set_mode((Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT))
+    # Set up the game window with resizable flag
+    screen = pygame.display.set_mode(
+        (Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT),
+        pygame.RESIZABLE
+    )
     pygame.display.set_caption("CursorDraw")
     
     # Initialize clock for controlling frame rate
@@ -37,6 +40,24 @@ def main():
         for event in pygame.event.get():
             if event.type == QUIT:
                 running = False
+            elif event.type == VIDEORESIZE:
+                # Handle window resize event
+                width, height = event.size
+                # Update the Config values to reflect the new size
+                Config.SCREEN_WIDTH = width
+                Config.SCREEN_HEIGHT = height
+                # Recreate the display surface with the new size
+                screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+                # Recreate the current screen with the new surface
+                if isinstance(current_screen, MainMenu):
+                    current_screen = MainMenu(screen, game_state)
+                else:
+                    # Get the current screen type and recreate it
+                    screen_type = type(current_screen)
+                    if hasattr(current_screen, 'feature_name'):
+                        current_screen = screen_type(screen, game_state, current_screen.feature_name)
+                    else:
+                        current_screen = screen_type(screen, game_state)
             else:
                 # Pass events to current screen
                 current_screen.handle_event(event)
