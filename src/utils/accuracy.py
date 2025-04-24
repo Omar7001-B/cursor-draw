@@ -1,4 +1,5 @@
 import pygame
+import math  # Add explicit import for math module
 from typing import Dict, Any, Tuple, Optional
 from src.config import Config
 
@@ -160,7 +161,7 @@ class AccuracyTracker:
         
         # Add pulsing effect for completed shapes
         if self.metrics["completed"]:
-            pulse = 0.5 + 0.5 * abs(pygame.math.sin(current_time / 200))  # Pulsing value between 0.5 and 1.0
+            pulse = 0.5 + 0.5 * abs(math.sin(current_time / 200))  # Use math.sin instead of pygame.math.sin
             grade_size = int(scaled_font_sizes['large'] * (1.0 + pulse * 0.15))  # Increase size by up to 15%
             grade_font = pygame.font.SysFont(None, grade_size)
         
