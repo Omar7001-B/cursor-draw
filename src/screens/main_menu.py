@@ -20,44 +20,59 @@ class MainMenu:
         """Set up UI elements for the main menu"""
         screen_width, screen_height = self.screen.get_size()
         
+        # Get scaled dimensions
+        scaled_font_sizes = Config.get_scaled_font_sizes()
+        scaled_button_width, scaled_button_height = Config.get_scaled_button_dimensions()
+        
+        # Header bar
+        self.header_rect = pygame.Rect(0, 0, screen_width, Config.scale_height(80))
+        
         # Title
         self.title_label = Label(
             screen_width // 2,
-            50,
+            Config.scale_height(40),
             "CursorDraw",
-            font_size=Config.FONT_LARGE,
+            font_size=scaled_font_sizes['large'],
             centered=True
         )
         
         # Subtitle
         self.subtitle_label = Label(
             screen_width // 2,
-            100,
+            Config.scale_height(100),
             "Improve your cursor control through drawing games",
-            font_size=Config.FONT_MEDIUM,
+            font_size=scaled_font_sizes['medium'],
             centered=True
         )
         
-        # Create game grid
+        # Calculate spacing based on screen dimensions
+        h_spacing = Config.scale_width(20)
+        v_spacing = Config.scale_height(20)
+        
+        # Create game grid with improved styling
         self.game_grid = GridLayout(
-            (screen_width - (Config.BUTTON_WIDTH * 3 + 20 * 2)) // 2,
-            150,
-            Config.BUTTON_WIDTH,
-            Config.BUTTON_HEIGHT,
+            (screen_width - (scaled_button_width * 3 + h_spacing * 2)) // 2,
+            Config.scale_height(150),
+            scaled_button_width,
+            scaled_button_height,
             3,  # 3 columns
-            20,  # horizontal spacing
-            20   # vertical spacing
+            h_spacing,  # horizontal spacing
+            v_spacing   # vertical spacing
         )
         
         # Add implemented games
         for game_name in Config.IMPLEMENTED_GAMES:
             button = Button(
                 0, 0,  # Will be positioned by grid
-                Config.BUTTON_WIDTH,
-                Config.BUTTON_HEIGHT,
+                scaled_button_width,
+                scaled_button_height,
                 game_name,
                 lambda name=game_name: self._start_game(name),
-                bg_color=Config.GREEN
+                bg_color=Config.GREEN,
+                hover_color=(100, 200, 100),
+                text_color=Config.WHITE,
+                rounded=True,
+                font_size=scaled_font_sizes['small']
             )
             self.game_grid.add_item(button)
             
@@ -65,29 +80,40 @@ class MainMenu:
         for game_name in Config.COMING_SOON_GAMES:
             button = Button(
                 0, 0,  # Will be positioned by grid
-                Config.BUTTON_WIDTH,
-                Config.BUTTON_HEIGHT,
+                scaled_button_width,
+                scaled_button_height,
                 game_name,
                 lambda name=game_name: self._show_coming_soon(name),
                 bg_color=Config.GRAY,
-                disabled=True
+                text_color=Config.WHITE,
+                disabled=True,
+                rounded=True,
+                font_size=scaled_font_sizes['small']
             )
             self.game_grid.add_item(button)
             
         # Settings button
         self.settings_button = Button(
-            screen_width - Config.BUTTON_WIDTH - 20,
-            screen_height - Config.BUTTON_HEIGHT - 20,
-            Config.BUTTON_WIDTH,
-            Config.BUTTON_HEIGHT,
+            screen_width - scaled_button_width - Config.scale_width(20),
+            screen_height - scaled_button_height - Config.scale_height(20),
+            scaled_button_width,
+            scaled_button_height,
             "Settings",
-            self._show_settings
+            self._show_settings,
+            bg_color=Config.BLUE,
+            hover_color=(100, 150, 255),
+            text_color=Config.WHITE,
+            rounded=True,
+            font_size=scaled_font_sizes['small']
         )
             
     def handle_event(self, event):
         """Handle pygame events"""
         if event.type == pygame.MOUSEMOTION:
             self.update(event.pos)
+        elif event.type == pygame.VIDEORESIZE:
+            # Recreate UI elements when window is resized
+            self._setup_ui()
             
         # Pass event to grid
         self.game_grid.handle_event(event)
@@ -114,11 +140,22 @@ class MainMenu:
         
     def render(self):
         """Render the menu"""
-        # Clear screen
+        # Clear screen with a gradient effect
         self.screen.fill(Config.WHITE)
         
-        # Draw title and subtitle
+        # Get screen dimensions
+        screen_width, screen_height = self.screen.get_size()
+        
+        # Draw header bar
+        pygame.draw.rect(self.screen, Config.BLUE, self.header_rect)
+        
+        # Draw title with white color for contrast against blue background
+        title_color_original = self.title_label.color
+        self.title_label.color = Config.WHITE
         self.title_label.draw(self.screen)
+        self.title_label.color = title_color_original
+        
+        # Draw subtitle
         self.subtitle_label.draw(self.screen)
         
         # Draw game grid
@@ -126,6 +163,15 @@ class MainMenu:
         
         # Draw settings button
         self.settings_button.draw(self.screen)
+        
+        # Draw a decorative line below the subtitle
+        pygame.draw.line(
+            self.screen,
+            Config.GRAY,
+            (screen_width // 4, Config.scale_height(120)),
+            (3 * screen_width // 4, Config.scale_height(120)),
+            Config.scale_height(2)
+        )
         
     def _start_game(self, game_name):
         """Start the selected game"""

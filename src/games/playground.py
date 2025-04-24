@@ -21,13 +21,17 @@ class WhiteboardPlayground:
         """Set up UI elements for the whiteboard playground"""
         screen_width, screen_height = self.screen.get_size()
         
+        # Get scaled dimensions
+        scaled_font_sizes = Config.get_scaled_font_sizes()
+        scaled_button_width, scaled_button_height = Config.get_scaled_button_dimensions()
+        
         # Calculate whiteboard position and size
         # Leave margin at top for UI controls and at bottom for menu button
-        whiteboard_margin_top = 60
-        whiteboard_margin_bottom = 70
-        whiteboard_width = screen_width - 40
+        whiteboard_margin_top = Config.scale_height(70)  # Increased for better header spacing
+        whiteboard_margin_bottom = Config.scale_height(70)
+        whiteboard_width = screen_width - Config.scale_width(40)
         whiteboard_height = screen_height - whiteboard_margin_top - whiteboard_margin_bottom
-        whiteboard_x = 20
+        whiteboard_x = Config.scale_width(20)
         whiteboard_y = whiteboard_margin_top
         
         # Create whiteboard
@@ -41,20 +45,28 @@ class WhiteboardPlayground:
         # Title
         self.title_label = Label(
             screen_width // 2,
-            20,
+            Config.scale_height(25),
             "Whiteboard Playground",
-            font_size=Config.FONT_MEDIUM,
+            font_size=scaled_font_sizes['large'],
             centered=True
         )
         
-        # Back to Menu button
+        # Header bar
+        self.header_rect = pygame.Rect(0, 0, screen_width, Config.scale_height(50))
+        
+        # Back to Menu button - more professional with rounded corners
         self.menu_button = Button(
-            20,
-            screen_height - 60,
-            Config.BUTTON_WIDTH,
-            Config.BUTTON_HEIGHT,
+            Config.scale_width(20),
+            screen_height - Config.scale_height(60),
+            scaled_button_width,
+            scaled_button_height,
             "Back to Menu",
-            self._back_to_menu_with_check
+            self._back_to_menu_with_check,
+            bg_color=Config.BLUE,
+            hover_color=(100, 150, 255),
+            text_color=Config.WHITE,
+            rounded=True,
+            font_size=scaled_font_sizes['small']
         )
             
     def handle_event(self, event):
@@ -63,6 +75,12 @@ class WhiteboardPlayground:
         if self.active_dialog:
             if self.active_dialog.handle_event(event):
                 return
+        
+        # Handle resize event
+        if event.type == pygame.VIDEORESIZE:
+            # Recreate UI elements when window is resized
+            self._setup_ui()
+            return
         
         # Pass events to whiteboard
         if self.whiteboard.handle_event(event):
@@ -100,8 +118,14 @@ class WhiteboardPlayground:
         # Clear screen
         self.screen.fill(Config.LIGHT_GRAY)
         
+        # Draw header bar
+        pygame.draw.rect(self.screen, Config.BLUE, self.header_rect)
+        
         # Draw title
+        title_color_original = self.title_label.color
+        self.title_label.color = Config.WHITE
         self.title_label.draw(self.screen)
+        self.title_label.color = title_color_original
         
         # Draw whiteboard
         self.whiteboard.render()
@@ -128,7 +152,10 @@ class WhiteboardPlayground:
                 self.screen,
                 "You have unsaved work.\nAre you sure you want to exit?",
                 confirm_exit,
-                cancel_exit
+                cancel_exit,
+                title="Return to Menu",
+                confirm_text="Exit",
+                cancel_text="Cancel"
             )
         else:
             # No content, go back directly

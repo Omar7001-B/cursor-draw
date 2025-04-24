@@ -19,12 +19,19 @@ class ComingSoonScreen:
         """Set up UI elements for the coming soon screen"""
         screen_width, screen_height = self.screen.get_size()
         
+        # Get scaled dimensions
+        scaled_font_sizes = Config.get_scaled_font_sizes()
+        scaled_button_width, scaled_button_height = Config.get_scaled_button_dimensions()
+        
+        # Header bar
+        self.header_rect = pygame.Rect(0, 0, screen_width, Config.scale_height(80))
+        
         # Title
         self.title_label = Label(
             screen_width // 2,
-            screen_height // 3,
+            Config.scale_height(40),
             f"{self.feature_name}",
-            font_size=Config.FONT_LARGE,
+            font_size=scaled_font_sizes['large'],
             centered=True
         )
         
@@ -33,7 +40,7 @@ class ComingSoonScreen:
             screen_width // 2,
             screen_height // 2,
             "Coming Soon!",
-            font_size=Config.FONT_LARGE,
+            font_size=scaled_font_sizes['large'],
             color=Config.RED,
             centered=True
         )
@@ -41,20 +48,25 @@ class ComingSoonScreen:
         # Additional info
         self.info_label = Label(
             screen_width // 2,
-            screen_height // 2 + 70,
+            screen_height // 2 + Config.scale_height(70),
             "This feature is currently under development.",
-            font_size=Config.FONT_MEDIUM,
+            font_size=scaled_font_sizes['medium'],
             centered=True
         )
         
         # Back button
         self.back_button = Button(
-            screen_width // 2 - Config.BUTTON_WIDTH // 2,
-            screen_height - 100,
-            Config.BUTTON_WIDTH,
-            Config.BUTTON_HEIGHT,
+            screen_width // 2 - scaled_button_width // 2,
+            screen_height - Config.scale_height(100),
+            scaled_button_width,
+            scaled_button_height,
             "Back to Menu",
-            self._go_back_to_menu
+            self._go_back_to_menu,
+            bg_color=Config.BLUE,
+            hover_color=(100, 150, 255),
+            text_color=Config.WHITE,
+            rounded=True,
+            font_size=scaled_font_sizes['small']
         )
             
     def handle_event(self, event):
@@ -62,6 +74,9 @@ class ComingSoonScreen:
         if event.type == pygame.MOUSEMOTION:
             # Update button hover state
             self.back_button.update(event.pos)
+        elif event.type == pygame.VIDEORESIZE:
+            # Recreate UI elements when window is resized
+            self._setup_ui()
             
         # Handle button clicks
         self.back_button.handle_event(event)
@@ -85,8 +100,28 @@ class ComingSoonScreen:
         # Clear screen
         self.screen.fill(Config.WHITE)
         
-        # Draw labels
+        # Draw header bar
+        pygame.draw.rect(self.screen, Config.BLUE, self.header_rect)
+        
+        # Draw title with white color for contrast against blue background
+        title_color_original = self.title_label.color
+        self.title_label.color = Config.WHITE
         self.title_label.draw(self.screen)
+        self.title_label.color = title_color_original
+        
+        # Draw coming soon box with scaled dimensions
+        box_width = Config.scale_width(600)
+        box_height = Config.scale_height(300)
+        box_rect = pygame.Rect(
+            (self.screen.get_width() - box_width) // 2,
+            (self.screen.get_height() - box_height) // 2 - Config.scale_height(30),
+            box_width,
+            box_height
+        )
+        pygame.draw.rect(self.screen, Config.LIGHT_GRAY, box_rect, border_radius=Config.scale_height(15))
+        pygame.draw.rect(self.screen, Config.GRAY, box_rect, Config.scale_height(3), border_radius=Config.scale_height(15))
+        
+        # Draw labels
         self.message_label.draw(self.screen)
         self.info_label.draw(self.screen)
         
