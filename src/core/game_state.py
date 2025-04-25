@@ -7,8 +7,11 @@ class GameState:
     """
     Manages the global state of the application, 
     including user progress and settings.
+    Also holds references to the main screen surface and game manager.
     """
-    def __init__(self):
+    def __init__(self, screen, game_manager):
+        self.screen = screen
+        self.game_manager = game_manager
         self.current_game = None
         self.user_progress = self._load_progress()
         self.settings = self._load_settings()

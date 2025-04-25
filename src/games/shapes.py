@@ -8,16 +8,20 @@ from src.core.whiteboard import Whiteboard
 from src.core.ui_manager import Button, Label, Dialog
 from src.utils.path_detection import PathDetection
 from src.utils.accuracy import AccuracyTracker
+from src.core.game_state import GameState
 
-class DrawBasicShapes:
+class DrawBasicShapes(GameState):
     """
     Draw Basic Shapes - A game where users trace over shapes to improve cursor control.
     """
-    def __init__(self, screen, game_state):
+    def __init__(self, screen, game_manager):
+        super().__init__(screen, game_manager)
         self.screen = screen
-        self.game_state = game_state
+        self.game_manager = game_manager
         self.next_screen = None
         self.active_dialog = None
+        self.next_screen_name = None # Use state name
+        self.request_menu_exit = False # Use a flag
         
         # Difficulty settings - tolerance for accuracy (higher = easier)
         self.difficulty_settings = {
@@ -75,7 +79,7 @@ class DrawBasicShapes:
             self.screen,
             (whiteboard_x, whiteboard_y),
             (whiteboard_width, whiteboard_height),
-            self.game_state,
+            self.game_manager,
             show_controls=False  # Hide controls for cleaner tracing experience
         )
         
@@ -242,6 +246,16 @@ class DrawBasicShapes:
             Config.scale_height(320)  # Slightly taller for more information
         )
         
+        self.back_button = Button(
+             self.accuracy_panel_pos[0] + button_margin, 
+             self.accuracy_panel_pos[1] + button_spacing, 
+             button_width, 
+             button_height, 
+             "Back", 
+             self._go_back,
+             font_size=Config.get_scaled_font_sizes()['small']
+        )
+        
     def _set_difficulty(self, difficulty):
         """Change the current difficulty level"""
         if difficulty in self.difficulty_settings:
@@ -337,8 +351,9 @@ class DrawBasicShapes:
         if len(self.drawn_points) > 0 and not self.shape_completed:
             def confirm_exit():
                 self.active_dialog = None
+                self.request_menu_exit = True # Set flag
                 from src.screens.main_menu import MainMenu
-                self.next_screen = MainMenu(self.screen, self.game_state)
+                self.next_screen = MainMenu(self.screen, self.game_manager)
                 
             def cancel_exit():
                 self.active_dialog = None
@@ -353,8 +368,7 @@ class DrawBasicShapes:
                 cancel_text="No"
             )
         else:
-            from src.screens.main_menu import MainMenu
-            self.next_screen = MainMenu(self.screen, self.game_state)
+            self.request_menu_exit = True # Set flag
     
     def _clear_drawing(self):
         """Clear the current drawing but keep the shape outline"""
@@ -469,14 +483,14 @@ class DrawBasicShapes:
         # Handle dialog events first if active
         if self.active_dialog:
             if self.active_dialog.handle_event(event):
-                return
+                return True
         
         # Handle resize event
         if event.type == pygame.VIDEORESIZE:
             # Recreate UI elements when window is resized
             self._setup_ui()
             self._generate_current_shape()  # Regenerate shape with new dimensions
-            return
+            return True
         
         # Handle button events
         if event.type == pygame.MOUSEMOTION:
@@ -546,19 +560,27 @@ class DrawBasicShapes:
                 if len(self.drawn_points) > 0:
                     self._evaluate_tracing(is_final=True)
         
-    def update(self, mouse_pos=None):
+        if self.back_button.handle_event(event):
+            return True
+        
+        return False
+
+    def update(self, dt):
         """Update game state"""
         # Update UI buttons
-        if mouse_pos:
-            self.menu_button.update(mouse_pos)
-            self.clear_button.update(mouse_pos)
-            self.next_shape_button.update(mouse_pos)
-            self.random_shape_button.update(mouse_pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(mouse_pos)
-            
+        if self.whiteboard.handle_event(event):
+            return True
+        
+        mouse_pos = pygame.mouse.get_pos()
+        self.menu_button.update(mouse_pos)
+        self.clear_button.update(mouse_pos)
+        self.next_shape_button.update(mouse_pos)
+        self.random_shape_button.update(mouse_pos)
+        
+        # Update difficulty buttons
+        for button in self.difficulty_buttons.values():
+            button.update(mouse_pos)
+        
         # Update dialog if active
         if self.active_dialog and mouse_pos:
             self.active_dialog.update(mouse_pos)
@@ -568,17 +590,15 @@ class DrawBasicShapes:
             self.auto_progress_timer = None
             self._next_shape()  # Automatically progress to next shape
             
-        # Return next screen if set
-        if self.next_screen:
-            next_screen = self.next_screen
-            self.next_screen = None
-            return next_screen
-            
-        return None
+        # Handle state transitions - Return state name string
+        if self.request_menu_exit:
+             self.request_menu_exit = False # Reset flag
+             return 'main_menu' # Return state name
         
-    def render(self):
+        return None # No state change
+
+    def draw(self):
         """Render the game"""
-        # Clear screen
         self.screen.fill(Config.LIGHT_GRAY)
         
         # Draw header bar
@@ -602,7 +622,7 @@ class DrawBasicShapes:
         self.instruction_label.draw(self.screen)
         
         # Draw whiteboard
-        self.whiteboard.render()
+        self.whiteboard.draw()
         
         # Draw accuracy panel
         self.accuracy_tracker.draw_accuracy_panel(
@@ -617,7 +637,26 @@ class DrawBasicShapes:
         self.clear_button.draw(self.screen)
         self.random_shape_button.draw(self.screen)
         self.next_shape_button.draw(self.screen)
+        self.back_button.draw(self.screen)
         
         # Draw dialog if active
         if self.active_dialog:
-            self.active_dialog.draw() 
+            self.active_dialog.draw()
+        
+    def _go_back(self):
+        # This method is likely called by the back button
+        # Check if content exists before setting flag
+        self._back_to_menu_with_check()
+
+    def handle_resize(self):
+         # Recalculate layout and re-setup UI
+         self._calculate_layout()
+         self._setup_ui()
+        
+    def _calculate_layout(self):
+        # Implementation of _calculate_layout method
+        pass
+        
+    def _setup_ui(self):
+        # Implementation of _setup_ui method
+        pass 

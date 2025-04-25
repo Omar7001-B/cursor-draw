@@ -13,10 +13,10 @@ class MainMenu:
     """
     Main menu screen that provides access to all games and features.
     """
-    def __init__(self, screen, game_state):
+    def __init__(self, screen, game_manager):
         self.screen = screen
-        self.game_state = game_state
-        self.next_screen = None
+        self.game_manager = game_manager
+        self.next_screen_name = None
         
         # Set up UI elements
         self._setup_ui()
@@ -117,33 +117,36 @@ class MainMenu:
         if event.type == pygame.MOUSEMOTION:
             self.update(event.pos)
         elif event.type == pygame.VIDEORESIZE:
-            # Recreate UI elements when window is resized
             self._setup_ui()
+            return True
             
         # Pass event to grid
-        self.game_grid.handle_event(event)
+        if self.game_grid.handle_event(event):
+            return True
         
         # Pass event to settings button
-        self.settings_button.handle_event(event)
+        if self.settings_button.handle_event(event):
+            return True
+            
+        return False
         
-    def update(self, mouse_pos=None):
+    def update(self, dt):
         """Update menu state"""
-        if mouse_pos:
-            # Update game grid buttons
-            self.game_grid.update(mouse_pos)
+        mouse_pos = pygame.mouse.get_pos()
+        # Update game grid buttons
+        self.game_grid.update(mouse_pos)
+        # Update settings button
+        self.settings_button.update(mouse_pos)
             
-            # Update settings button
-            self.settings_button.update(mouse_pos)
-            
-        # Return next screen if set
-        if self.next_screen:
-            next_screen = self.next_screen
-            self.next_screen = None
-            return next_screen
+        # Return next screen name if set
+        if self.next_screen_name:
+            next_name = self.next_screen_name
+            self.next_screen_name = None
+            return next_name
             
         return None
         
-    def render(self):
+    def draw(self):
         """Render the menu"""
         # Clear screen with a gradient effect
         self.screen.fill(Config.WHITE)
@@ -179,30 +182,13 @@ class MainMenu:
         )
         
     def _start_game(self, game_name):
-        """Start the selected game"""
-        self.game_state.set_current_game(game_name)
-        
-        if game_name == "Whiteboard Playground":
-            self.next_screen = WhiteboardPlayground(self.screen, self.game_state)
-        elif game_name == "Draw Basic Shapes":
-            self.next_screen = DrawBasicShapes(self.screen, self.game_state)
-        elif game_name == "Trace the Letter":
-            self.next_screen = TraceTheLetter(self.screen, self.game_state)
-        elif game_name == "Trace the Number":
-            self.next_screen = TraceTheNumber(self.screen, self.game_state)
-        elif game_name == "Trace the Sentence":
-            self.next_screen = TraceTheSentence(self.screen, self.game_state)
-        elif game_name == "Whiteboard to Text":
-            self.next_screen = TextConverterGame(self.screen, self.game_state)
-        else:
-            # For implemented games that don't have a class yet
-            self.next_screen = ComingSoonScreen(self.screen, self.game_state, game_name)
+        """Request state change to the selected game"""
+        self.next_screen_name = game_name
             
     def _show_coming_soon(self, game_name):
-        """Show the coming soon screen for a game"""
-        self.next_screen = ComingSoonScreen(self.screen, self.game_state, game_name)
+        """Request state change to the coming soon screen"""
+        self.next_screen_name = f"coming_soon_{game_name}"
         
     def _show_settings(self):
-        """Show settings screen (not implemented in Phase 1)"""
-        # For Phase 1, we just show a coming soon screen
-        self.next_screen = ComingSoonScreen(self.screen, self.game_state, "Settings") 
+        """Request state change to settings screen"""
+        self.next_screen_name = "settings" 

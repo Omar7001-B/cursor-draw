@@ -11,7 +11,101 @@ if parent_dir not in sys.path:
 
 from src.config import Config
 from src.screens.main_menu import MainMenu
-from src.core.game_state import GameState
+from src.games.playground import WhiteboardPlayground
+from src.games.shapes import DrawBasicShapes
+from src.games.letters import TraceTheLetter
+from src.games.numbers import TraceTheNumber
+from src.games.sentence import TraceTheSentence
+from src.games.text_converter import TextConverterGame
+from src.screens.coming_soon import ComingSoonScreen
+# Note: Settings screen might not exist yet, handle appropriately
+
+# Define GameStateManager at the top level
+class GameStateManager:
+    def __init__(self, screen):
+        self.screen = screen
+        self.states = {}
+        self.active_state_name = None
+        self.active_state = None
+        self._register_states()
+
+    def _register_states(self):
+        self.register_state('main_menu', MainMenu)
+        self.register_state('Whiteboard Playground', WhiteboardPlayground)
+        self.register_state('Draw Basic Shapes', DrawBasicShapes)
+        self.register_state('Trace the Letter', TraceTheLetter)
+        self.register_state('Trace the Number', TraceTheNumber)
+        self.register_state('Trace the Sentence', TraceTheSentence)
+        self.register_state('Whiteboard to Text', TextConverterGame)
+        self.register_state('coming_soon', ComingSoonScreen) # Generic coming soon
+        # Register specific coming soon states
+        for game_name in Config.COMING_SOON_GAMES:
+             state_name = f"coming_soon_{game_name}"
+             self.register_state(state_name, lambda screen, manager, name=game_name: ComingSoonScreen(screen, manager, name))
+        # Register settings coming soon state
+        self.register_state("settings", lambda screen, manager: ComingSoonScreen(screen, manager, "Settings"))
+
+    def register_state(self, name, state_class):
+        self.states[name] = state_class
+        
+    def change_state(self, state_name, *args, **kwargs):
+        if self.active_state:
+             if hasattr(self.active_state, 'exit'):
+                 self.active_state.exit() # Optional cleanup
+
+        if state_name in self.states:
+            self.active_state_name = state_name
+            # Pass self (game_manager) to the state constructor
+            self.active_state = self.states[state_name](self.screen, self, *args, **kwargs) 
+            if hasattr(self.active_state, 'enter'):
+                self.active_state.enter() # Optional setup
+        else:
+            print(f"Warning: State '{state_name}' not registered.")
+            # Fallback or error handling
+            # For now, maybe default to main menu if available
+            if 'main_menu' in self.states and state_name != 'main_menu':
+                self.change_state('main_menu')
+            else:
+                 # If main_menu itself fails, something is wrong
+                 print(f"Error: Cannot switch to unregistered state '{state_name}'.")
+                 pygame.quit()
+                 sys.exit(1)
+        
+        def handle_event(self, event):
+            if self.active_state:
+                self.active_state.handle_event(event)
+                
+        def update(self, dt):
+             if self.active_state:
+                next_state_name = self.active_state.update(dt) # Pass dt
+                if next_state_name and next_state_name != self.active_state_name:
+                    self.change_state(next_state_name)
+        
+        def draw(self):
+            if self.active_state:
+                self.active_state.draw()
+                
+        def handle_resize(self):
+            if self.active_state:
+                 if hasattr(self.active_state, 'handle_resize'):
+                     self.active_state.handle_resize()
+                 else: # Default recreate state if no specific handler
+                      print(f"Recreating state {self.active_state_name} after resize.")
+                      try:
+                           current_args = getattr(self.active_state, '_init_args', ()) 
+                           current_kwargs = getattr(self.active_state, '_init_kwargs', {})
+                           self.active_state = self.states[self.active_state_name](self.screen, self, *current_args, **current_kwargs)
+                      except Exception as e:
+                           print(f"Error recreating state after resize: {e}. Falling back to main menu.")
+                           if 'main_menu' in self.states:
+                               self.change_state('main_menu')
+                           else: 
+                                print("Error: Main menu state not found.")
+                                pygame.quit()
+                                sys.exit(1)
+                                
+        def get_current_state_instance(self):
+            return self.active_state
 
 def main():
     # Initialize pygame
@@ -56,17 +150,18 @@ def main():
     # Initialize clock for controlling frame rate
     clock = pygame.time.Clock()
     
-    # Create game state
-    game_state = GameState()
+    # Create game state manager
+    game_manager = GameStateManager(screen)
     
-    # Start with the main menu
-    current_screen = MainMenu(screen, game_state)
+    # Start with the main menu state
+    game_manager.change_state('main_menu') 
     
     # Main game loop
     running = True
     while running:
         # Event handling
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        for event in events:
             if event.type == QUIT:
                 running = False
             elif event.type == VIDEORESIZE:
@@ -83,37 +178,24 @@ def main():
                 
                 # Recreate the display surface with the new size
                 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+                game_manager.screen = screen # Update screen reference
                 
-                # Recreate the current screen with the new surface
-                if isinstance(current_screen, MainMenu):
-                    current_screen = MainMenu(screen, game_state)
-                else:
-                    # Get the current screen type and recreate it
-                    screen_type = type(current_screen)
-                    if hasattr(current_screen, 'feature_name'):
-                        current_screen = screen_type(screen, game_state, current_screen.feature_name)
-                    else:
-                        current_screen = screen_type(screen, game_state)
+                # Let the game manager handle recreating the current screen
+                game_manager.handle_resize()
             else:
-                # Pass events to current screen
-                current_screen.handle_event(event)
+                # Pass events via game manager
+                game_manager.handle_event(event)
         
-        # Update current screen
-        next_screen = current_screen.update(pygame.mouse.get_pos())
+        # Update current screen via game manager
+        dt = clock.tick(Config.FPS) / 1000.0 # Calculate delta time
+        game_manager.update(dt)
         
-        # Change screens if needed
-        if next_screen and next_screen != current_screen:
-            current_screen = next_screen
-        
-        # Render current screen
-        current_screen.render()
+        # Render current screen via game manager
+        game_manager.draw()
         
         # Update display
         pygame.display.flip()
         
-        # Control frame rate
-        clock.tick(Config.FPS)
-    
     # Clean up
     pygame.quit()
     sys.exit()

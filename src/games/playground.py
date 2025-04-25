@@ -2,16 +2,18 @@ import pygame
 from src.config import Config
 from src.core.whiteboard import Whiteboard
 from src.core.ui_manager import Button, Label, Dialog
+from src.core.game_state import GameState
 
-class WhiteboardPlayground:
+class WhiteboardPlayground(GameState):
     """
     Whiteboard Playground - A free-drawing mode that establishes 
     core whiteboard functionality.
     """
-    def __init__(self, screen, game_state):
+    def __init__(self, screen, game_manager):
+        super().__init__(screen, game_manager)
         self.screen = screen
-        self.game_state = game_state
-        self.next_screen = None
+        self.game_manager = game_manager
+        self.next_screen_name = None
         self.active_dialog = None
         
         # Set up UI elements
@@ -39,7 +41,7 @@ class WhiteboardPlayground:
             self.screen,
             (whiteboard_x, whiteboard_y),
             (whiteboard_width, whiteboard_height),
-            self.game_state
+            self.game_manager
         )
         
         # Title
@@ -59,16 +61,12 @@ class WhiteboardPlayground:
 
         # Clear button - add a direct clear button
         self.clear_button = Button(
-            Config.scale_width(20) + scaled_button_width + button_spacing,
-            screen_height - Config.scale_height(60),
-            scaled_button_width,
-            scaled_button_height,
+            Config.scale_width(75),
+            Config.scale_height(10),
+            Config.scale_width(60),
+            Config.scale_height(30),
             "Clear",
-            self._clear_drawing,
-            bg_color=Config.LIGHT_GRAY,
-            hover_color=Config.GRAY,
-            text_color=Config.BLACK,
-            rounded=True,
+            self.whiteboard.clear_canvas,
             font_size=scaled_font_sizes['small']
         )
         
@@ -87,50 +85,39 @@ class WhiteboardPlayground:
             font_size=scaled_font_sizes['small']
         )
     
-    def _clear_drawing(self):
-        """Clear the canvas immediately without confirmation dialog"""
-        # Get the current whiteboard size
-        wb_width, wb_height = self.whiteboard.size
-        
-        # Create a completely new white surface
-        self.whiteboard.drawing_engine.surface = pygame.Surface((wb_width, wb_height))
-        self.whiteboard.drawing_engine.surface.fill(Config.WHITE)
-        
-        # Reset strokes list in drawing engine
-        self.whiteboard.drawing_engine.strokes = []
-        
-        # Add this clear action to the drawing history
-        self.whiteboard.drawing_engine._add_to_history()
-            
     def handle_event(self, event):
         """Handle pygame events"""
         # Handle dialog events first if active
         if self.active_dialog:
             if self.active_dialog.handle_event(event):
-                return
+                return True
         
         # Handle resize event
         if event.type == pygame.VIDEORESIZE:
             # Recreate UI elements when window is resized
             self._setup_ui()
-            return
+            return True
         
         # Pass events to whiteboard
         if self.whiteboard.handle_event(event):
-            return
+            return True
             
         # Handle button events
         if event.type == pygame.MOUSEMOTION:
             self.menu_button.update(event.pos)
             self.clear_button.update(event.pos)
             
-        self.menu_button.handle_event(event)
-        self.clear_button.handle_event(event)
+        if self.menu_button.handle_event(event):
+            return True
+        if self.clear_button.handle_event(event):
+            return True
         
-    def update(self, mouse_pos=None):
+        return False
+        
+    def update(self, dt):
         """Update game state"""
-        # Update whiteboard
-        self.whiteboard.update(mouse_pos)
+        mouse_pos = pygame.mouse.get_pos()
+        self.whiteboard.update(dt)
         
         # Update buttons
         if mouse_pos:
@@ -141,17 +128,16 @@ class WhiteboardPlayground:
         if self.active_dialog and mouse_pos:
             self.active_dialog.update(mouse_pos)
             
-        # Return next screen if set
-        if self.next_screen:
-            next_screen = self.next_screen
-            self.next_screen = None
-            return next_screen
+        # Return next screen name if set
+        if self.next_screen_name:
+            next_name = self.next_screen_name
+            self.next_screen_name = None
+            return next_name
             
         return None
         
-    def render(self):
+    def draw(self):
         """Render the game"""
-        # Clear screen
         self.screen.fill(Config.LIGHT_GRAY)
         
         # Draw header bar
@@ -164,7 +150,7 @@ class WhiteboardPlayground:
         self.title_label.color = title_color_original
         
         # Draw whiteboard
-        self.whiteboard.render()
+        self.whiteboard.draw()
         
         # Draw buttons
         self.menu_button.draw(self.screen)
@@ -179,8 +165,8 @@ class WhiteboardPlayground:
         if self.whiteboard.has_content():
             # Show confirmation dialog
             def confirm_exit():
-                self._go_back_to_menu()
                 self.active_dialog = None
+                self.next_screen_name = 'main_menu'
                 
             def cancel_exit():
                 self.active_dialog = None
@@ -195,10 +181,17 @@ class WhiteboardPlayground:
                 cancel_text="Cancel"
             )
         else:
-            # No content, go back directly
-            self._go_back_to_menu()
+            self.next_screen_name = 'main_menu'
             
     def _go_back_to_menu(self):
         """Go back to the main menu"""
-        from src.screens.main_menu import MainMenu
-        self.next_screen = MainMenu(self.screen, self.game_state) 
+        self.next_screen_name = 'main_menu'
+
+    def handle_resize(self):
+        screen_width, screen_height = self.screen.get_size()
+        self.whiteboard.resize(0, Config.scale_height(80), screen_width, screen_height - Config.scale_height(80))
+        self._setup_ui()
+        
+    # Remove this method as it's handled by returning state name from update
+    # def _go_to_menu(self):
+    #     self.game_manager.change_state('main_menu') 
