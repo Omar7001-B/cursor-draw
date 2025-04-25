@@ -5,6 +5,7 @@ from src.games.playground import WhiteboardPlayground
 from src.games.shapes import DrawBasicShapes
 from src.games.letters import TraceTheLetter
 from src.games.numbers import TraceTheNumber
+from src.games.sentence import TraceTheSentence
 from src.screens.coming_soon import ComingSoonScreen
 
 class MainMenu:
@@ -188,6 +189,8 @@ class MainMenu:
             self.next_screen = TraceTheLetter(self.screen, self.game_state)
         elif game_name == "Trace the Number":
             self.next_screen = TraceTheNumber(self.screen, self.game_state)
+        elif game_name == "Trace the Sentence":
+            self.next_screen = TraceTheSentence(self.screen, self.game_state)
         else:
             # For implemented games that don't have a class yet
             self.next_screen = ComingSoonScreen(self.screen, self.game_state, game_name)
