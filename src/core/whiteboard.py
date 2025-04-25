@@ -99,14 +99,14 @@ class Whiteboard:
         )
         self.ui_elements.append(self.eraser_button)
         
-        # Clear button
+        # Clear button - Change callback to direct clear
         clear_button = Button(
             action_x + button_width + spacing,
             ui_y + Config.scale_height(5),
             button_width,
             button_height,
             "Clear",
-            self.clear_canvas,
+            self._clear_canvas_direct,
             font_size=scaled_font_sizes['small']
         )
         self.ui_elements.append(clear_button)
@@ -237,7 +237,7 @@ class Whiteboard:
                 self.eraser_button.hover_color = Config.GRAY
         
     def clear_canvas(self):
-        """Clear the canvas with confirmation dialog"""
+        """Clear the canvas WITH confirmation dialog (original method)."""
         # Check if canvas is empty by sampling key points
         empty = True
         for x in range(0, self.size[0], 50):  # Sample fewer points for efficiency
@@ -300,6 +300,13 @@ class Whiteboard:
             confirm_text="Clear",
             cancel_text="Cancel"
         )
+        
+    def _clear_canvas_direct(self):
+        """Directly clears the drawing engine canvas without confirmation."""
+        print("Whiteboard Clear button clicked - filling engine surface directly.")
+        engine = self.drawing_engine
+        engine.surface.fill(engine.bg_color)
+        engine._add_to_history()
         
     def save_canvas(self):
         """Save the canvas as an image"""
