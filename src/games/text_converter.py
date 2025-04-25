@@ -175,12 +175,17 @@ class TextConverterGame(GameState):
         engine = self.whiteboard.drawing_engine
         engine.clear_canvas(animated=False) 
         
-        # Force a refresh/redraw or state update within whiteboard?
-        # Let's try resetting the size - might trigger internal refresh (unlikely needed)
-        self.whiteboard.size = self.whiteboard.size 
+        # --- Diagnostic Step: Force render immediately after clear --- 
+        # self.whiteboard.render() 
+        # It's generally better practice to let the main draw loop handle this,
+        # but if the above doesn't work, we need to ensure the surface is 
+        # actually cleared visually immediately.
+        # Let's try forcing the blit directly here to be sure:
+        self.screen.blit(engine.surface, self.whiteboard.pos)
+        # -----------------------------------------------------------
         
-        self.recognized_text = ""
-        self.processing = False
+        self.recognized_text = "" # Clear the text display
+        self.processing = False # Ensure processing stops if clear is hit mid-process
 
     # Helper function for text wrapping (add this method to the class)
     def wrap_text(self, text, font, max_width):
