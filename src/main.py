@@ -23,12 +23,15 @@ def main():
     available_height = screen_info.current_h
     
     # Adjust initial window size if necessary to fit screen
-    window_width = min(Config.SCREEN_WIDTH, available_width - 50)  # Leave some margin
-    window_height = min(Config.SCREEN_HEIGHT, available_height - 50)  # Leave some margin for window controls
+    window_width = min(Config.SCREEN_WIDTH, available_width - 100)  # Increase margin
+    window_height = min(Config.SCREEN_HEIGHT, available_height - 100)  # Increase margin for window controls
     
     # Update Config to reflect the adjusted size
     Config.SCREEN_WIDTH = window_width
     Config.SCREEN_HEIGHT = window_height
+    
+    # Position the window properly - ensure it's not at the edge of the screen
+    os.environ['SDL_VIDEO_WINDOW_POS'] = f"{50},{50}"  # Position at (50,50)
     
     # Set up the game window with resizable flag
     screen = pygame.display.set_mode(
@@ -36,6 +39,10 @@ def main():
         pygame.RESIZABLE
     )
     pygame.display.set_caption("CursorDraw")
+    
+    # Force the window to be positioned correctly by moving it after creation
+    # This helps ensure the window decorations (title bar) are visible
+    pygame.display.set_mode((window_width, window_height), pygame.RESIZABLE)
     
     # Initialize clock for controlling frame rate
     clock = pygame.time.Clock()
@@ -58,8 +65,8 @@ def main():
                 width, height = event.size
                 
                 # Ensure the window doesn't exceed screen boundaries
-                width = min(width, available_width - 50)
-                height = min(height, available_height - 50)
+                width = min(width, available_width - 100)
+                height = min(height, available_height - 100)
                 
                 # Update the Config values to reflect the new size
                 Config.SCREEN_WIDTH = width

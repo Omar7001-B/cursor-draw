@@ -91,20 +91,24 @@ class DrawBasicShapes:
         # Instruction label - position below the whiteboard with proper spacing
         self.instruction_label = Label(
             whiteboard_x + whiteboard_width // 2,
-            whiteboard_y + whiteboard_height + Config.scale_height(15),
+            whiteboard_y + whiteboard_height + Config.scale_height(10),
             "Trace the shape as accurately as you can",
             font_size=scaled_font_sizes['small'],
             centered=True
         )
         
         # Calculate button positions with proper spacing to avoid overlap
-        button_y = screen_height - Config.scale_height(50)
+        # Use a more professional layout with even margins
+        button_margin = Config.scale_width(20)
+        button_width = scaled_button_width * 0.85  # Slightly smaller buttons to fit 4 of them
+        button_spacing = (whiteboard_width - 4 * button_width - 2 * button_margin) / 3
+        button_y = screen_height - Config.scale_height(45)  # Move up slightly
         
-        # Back to Menu button - left side
+        # Back to Menu button - leftmost
         self.menu_button = Button(
-            Config.scale_width(30),
+            whiteboard_x + button_margin,
             button_y,
-            scaled_button_width,
+            button_width,
             scaled_button_height,
             "Back to Menu",
             self._back_to_menu_with_check,
@@ -115,12 +119,12 @@ class DrawBasicShapes:
             font_size=scaled_font_sizes['small']
         )
         
-        # Clear button - center left
-        clear_x = whiteboard_x + whiteboard_width // 4 - scaled_button_width // 2
+        # Clear button - second from left
+        clear_x = whiteboard_x + button_margin + button_width + button_spacing
         self.clear_button = Button(
             clear_x,
             button_y,
-            scaled_button_width,
+            button_width,
             scaled_button_height,
             "Clear",
             self._clear_drawing,
@@ -131,12 +135,28 @@ class DrawBasicShapes:
             font_size=scaled_font_sizes['small']
         )
         
-        # Next Shape button - center right (initially disabled)
-        next_x = whiteboard_x + 3 * whiteboard_width // 4 - scaled_button_width // 2
+        # Random Shape button - third from left
+        random_x = clear_x + button_width + button_spacing
+        self.random_shape_button = Button(
+            random_x,
+            button_y,
+            button_width,
+            scaled_button_height,
+            "Random Shape",
+            self._random_shape,
+            bg_color=(50, 180, 150),  # Teal color
+            hover_color=(80, 210, 180),
+            text_color=Config.WHITE,
+            rounded=True,
+            font_size=scaled_font_sizes['small']
+        )
+        
+        # Next Shape button - rightmost (initially disabled)
+        next_x = random_x + button_width + button_spacing
         self.next_shape_button = Button(
             next_x,
             button_y,
-            scaled_button_width,
+            button_width,
             scaled_button_height,
             "Next Shape",
             self._next_shape,
@@ -224,9 +244,13 @@ class DrawBasicShapes:
     
     def _clear_drawing(self):
         """Clear the current drawing"""
+        # First create a new blank surface by filling with white
         self.whiteboard.drawing_engine.clear_canvas()
+        
+        # Reset all state
         self.drawn_points = []
         self.is_tracing = False
+        self.accuracy_tracker.reset()
         self.next_shape_button.disabled = not self.shape_completed
         
         # Redraw the shape outline
@@ -237,12 +261,33 @@ class DrawBasicShapes:
             width=4,
             alpha=100
         )
+        
+        # Add this clear action to the drawing history
+        self.whiteboard.drawing_engine._add_to_history()
     
     def _next_shape(self):
         """Proceed to the next shape"""
         if self.shape_completed:
             self.current_shape_index += 1
+            # Clear whiteboard before generating new shape
             self._generate_current_shape()
+            
+    def _random_shape(self):
+        """Switch to a random shape"""
+        import random
+        
+        # Get a random shape index different from current
+        if len(self.shapes_data) > 1:
+            new_index = self.current_shape_index
+            while new_index == self.current_shape_index:
+                new_index = random.randint(0, len(self.shapes_data) - 1)
+            self.current_shape_index = new_index
+        else:
+            # If only one shape, just restart it
+            pass
+            
+        # Clear whiteboard and generate the new shape
+        self._generate_current_shape()
     
     def _evaluate_tracing(self, is_final=False):
         """
@@ -289,6 +334,10 @@ class DrawBasicShapes:
                     confirm_text="OK"
                 )
             
+    # Modify the real-time accuracy evaluation to reduce frequency
+    point_count = 0
+    last_evaluation_time = 0
+    
     def handle_event(self, event):
         """Handle pygame events"""
         # Handle dialog events first if active
@@ -308,10 +357,12 @@ class DrawBasicShapes:
             self.menu_button.update(event.pos)
             self.clear_button.update(event.pos)
             self.next_shape_button.update(event.pos)
+            self.random_shape_button.update(event.pos)
             
         self.menu_button.handle_event(event)
         self.clear_button.handle_event(event)
         self.next_shape_button.handle_event(event)
+        self.random_shape_button.handle_event(event)
         
         # Handle drawing events
         canvas_rect = pygame.Rect(
@@ -331,6 +382,8 @@ class DrawBasicShapes:
                 self.whiteboard.drawing_engine.start_drawing(canvas_pos)
                 self.is_tracing = True
                 self.drawn_points = [canvas_pos]  # Start tracking points
+                self.point_count = 1
+                self.last_evaluation_time = pygame.time.get_ticks()
                 
         elif event.type == pygame.MOUSEMOTION:
             if self.whiteboard.drawing_engine.is_drawing and canvas_rect.collidepoint(event.pos):
@@ -341,9 +394,14 @@ class DrawBasicShapes:
                 )
                 self.whiteboard.drawing_engine.draw_to(canvas_pos)
                 self.drawn_points.append(canvas_pos)  # Track point for accuracy
+                self.point_count += 1
                 
-                # Update accuracy metrics in real-time as user draws
-                self._evaluate_tracing(is_final=False)
+                # Only update accuracy every 10 points or after 100ms to reduce performance impact
+                current_time = pygame.time.get_ticks()
+                if (self.point_count >= 10 or (current_time - self.last_evaluation_time) > 100):
+                    self._evaluate_tracing(is_final=False)
+                    self.point_count = 0
+                    self.last_evaluation_time = current_time
                 
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:  # Left release
             if self.whiteboard.drawing_engine.is_drawing:
@@ -361,6 +419,7 @@ class DrawBasicShapes:
             self.menu_button.update(mouse_pos)
             self.clear_button.update(mouse_pos)
             self.next_shape_button.update(mouse_pos)
+            self.random_shape_button.update(mouse_pos)
             
         # Update dialog if active
         if self.active_dialog and mouse_pos:
@@ -422,6 +481,7 @@ class DrawBasicShapes:
         # Draw buttons
         self.menu_button.draw(self.screen)
         self.clear_button.draw(self.screen)
+        self.random_shape_button.draw(self.screen)
         self.next_shape_button.draw(self.screen)
         
         # Draw dialog if active
