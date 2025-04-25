@@ -617,6 +617,8 @@ class DrawBasicShapes(GameState):
             self.active_dialog.draw()
         
     def handle_resize(self):
+         # Recalculate layout and re-setup UI
+         # self._calculate_layout() # Remove call if method is removed
          self._setup_ui()
          self._generate_current_shape() # Regenerate shape
          
@@ -625,15 +627,9 @@ class DrawBasicShapes(GameState):
         # Check if content exists before setting flag
         self._request_menu_exit()
 
-    def handle_resize(self):
-         # Recalculate layout and re-setup UI
-         self._calculate_layout()
-         self._setup_ui()
+    # Remove the duplicate/empty method definitions below
+    # def _calculate_layout(self):
+    #     pass
         
-    def _calculate_layout(self):
-        # Implementation of _calculate_layout method
-        pass
-        
-    def _setup_ui(self):
-        # Implementation of _setup_ui method
-        pass 
+    # def _setup_ui(self):
+    #     pass 
