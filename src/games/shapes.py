@@ -50,10 +50,10 @@ class DrawBasicShapes(GameState):
         self.shape_completed = False
         self.auto_progress_timer = None  # Timer for automatic progression
         
-        # Set up UI elements
+        # Set up UI elements - THIS MUST CREATE self.whiteboard
         self._setup_ui()
         
-        # Generate the first shape
+        # Generate the first shape - THIS REQUIRES self.whiteboard
         self._generate_current_shape()
         
     def _setup_ui(self):
@@ -73,11 +73,11 @@ class DrawBasicShapes(GameState):
         whiteboard_x = Config.scale_width(20)
         whiteboard_y = whiteboard_margin_top
         
-        # Create whiteboard
+        # Create whiteboard with correct arguments
         self.whiteboard = Whiteboard(
             self.screen,
-            (whiteboard_x, whiteboard_y),
-            (whiteboard_width, whiteboard_height),
+            (whiteboard_x, whiteboard_y), # Position tuple
+            (whiteboard_width, whiteboard_height), # Size tuple
             show_controls=False
         )
         
