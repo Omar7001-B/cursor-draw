@@ -45,7 +45,7 @@ class MainMenu:
         self.subtitle_label = Label(
             screen_width // 2,
             Config.scale_height(100),
-            "Improve your cursor control through drawing games",
+            "Improve mouse drawing for better online demos & explanations! (Idea: Omar Abbas)",
             font_size=scaled_font_sizes['medium'],
             centered=True
         )
