@@ -23,25 +23,41 @@ class TextConverterGame(GameState):
         self.back_button = Button(10, 10, 100, 30, "Back", self.go_back)
         self.font = pygame.font.Font(None, 24)
         self.large_font = pygame.font.Font(None, 32)
+        self.processing = False # Flag to indicate OCR is running
 
         # Tesseract path might need configuration depending on the system
         # Uncomment and set path if necessary:
         # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
     def handle_event(self, event):
-        if self.whiteboard.handle_event(event):
-            # If whiteboard handled mouse up after drawing, trigger OCR
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and self.whiteboard.drawing_engine.is_drawing:
-                 # Ensure drawing is finished before processing
-                 self.whiteboard.drawing_engine.stop_drawing()
-                 self.recognize_drawing()
-            return True
-            
+        # Handle buttons first if they are outside the whiteboard area
+        button_handled = False
         if self.copy_button.handle_event(event):
-            return True
+            button_handled = True
         if self.back_button.handle_event(event):
-            return True
-        return False
+            button_handled = True
+            
+        if button_handled:
+             return True
+
+        # Handle whiteboard events AFTER checking buttons outside its area
+        whiteboard_handled = self.whiteboard.handle_event(event)
+
+        # Check if drawing stopped specifically via MOUSEBUTTONUP
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            # Check a flag or state within drawing_engine that indicates it *was* drawing
+            # Let's assume whiteboard.handle_event correctly calls stop_drawing 
+            # and returns True if it was drawing and stopped.
+            # We need to ensure whiteboard.handle_event behaves this way.
+            # For now, let's trigger based on the event if whiteboard handled it.
+            if whiteboard_handled:
+                 # Check if whiteboard is not currently drawing (meaning it just stopped)
+                 # This is still a bit indirect. A better way might be needed in Whiteboard itself.
+                 if not self.whiteboard.drawing_engine.is_drawing: 
+                      self.recognize_drawing() 
+                      return True # OCR triggered, event handled
+
+        return whiteboard_handled # Return True if whiteboard handled anything else
 
     def update(self, dt):
         self.whiteboard.update(dt)
@@ -58,9 +74,23 @@ class TextConverterGame(GameState):
 
         # Draw text display area
         pygame.draw.rect(self.screen, Config.GRAY, self.text_display_rect, 2, border_radius=5)
-        text_surface = self.font.render(self.recognized_text, True, Config.BLACK)
-        text_rect = text_surface.get_rect(topleft=(self.text_display_rect.x + 10, self.text_display_rect.y + 10))
-        self.screen.blit(text_surface, text_rect)
+        
+        display_text = self.recognized_text
+        # Show processing indicator if OCR is running
+        if self.processing: 
+             display_text = "Processing..."
+
+        # Wrap and render the text (result, error, or processing indicator)
+        lines = self.wrap_text(display_text, self.font, self.text_display_rect.width - 20) # Use helper
+        y_offset = self.text_display_rect.y + 10
+        for line in lines:
+             text_surface = self.font.render(line, True, Config.BLACK)
+             # Ensure text stays within the display rect vertically
+             if y_offset + self.font.get_linesize() <= self.text_display_rect.bottom - 10:
+                  self.screen.blit(text_surface, (self.text_display_rect.x + 10, y_offset))
+                  y_offset += self.font.get_linesize()
+             else:
+                  break # Stop drawing lines if they overflow the box
 
         # Draw Header
         header_surface = self.large_font.render("Whiteboard to Text", True, Config.BLACK)
@@ -74,6 +104,13 @@ class TextConverterGame(GameState):
         self.back_button.draw(self.screen)
 
     def recognize_drawing(self):
+        if self.processing: # Prevent overlapping calls
+             return
+             
+        self.processing = True
+        self.recognized_text = "Processing..." # Set indicator text immediately
+        # We don't force a draw here, the main loop will handle it
+
         try:
             # Get the drawing surface from the engine
             drawing_surface = self.whiteboard.drawing_engine.drawing_surface
@@ -82,21 +119,68 @@ class TextConverterGame(GameState):
             img_str = pygame.image.tostring(drawing_surface, 'RGB')
             img_pil = Image.frombytes('RGB', drawing_surface.get_size(), img_str)
             
+            # --- Optional: Check Tesseract version to ensure it's found ---
+            # try:
+            #     pytesseract.get_tesseract_version()
+            # except pytesseract.TesseractNotFoundError:
+            #      self.recognized_text = "OCR Error: Tesseract not found. Check install/path."
+            #      self.processing = False
+            #      return 
+            # -------------------------------------------------------------
+
             # Perform OCR using pytesseract
-            # Improve accuracy by specifying language and page segmentation mode if needed
-            # config='--psm 6' often works well for blocks of text
-            self.recognized_text = pytesseract.image_to_string(img_pil, config='--psm 6').strip()
+            recognized = pytesseract.image_to_string(img_pil, config='--psm 6').strip()
+            
+            if not recognized:
+                 self.recognized_text = "(No text detected)"
+            else:
+                 self.recognized_text = recognized
+                 
             print(f"Recognized Text: {self.recognized_text}") # For debugging
 
+        except pytesseract.TesseractNotFoundError:
+             # Specific error for Tesseract not being found
+             self.recognized_text = "OCR Error: Tesseract not found. Check installation/path."
+             print("Error during OCR: Tesseract not found.")
         except Exception as e:
-            self.recognized_text = f"OCR Error: {e}"
+            # Catch other potential errors during OCR
+            self.recognized_text = f"OCR Error: {type(e).__name__}"
             print(f"Error during OCR: {e}")
+        finally:
+            # Ensure processing flag is always reset
+            self.processing = False
 
     def copy_text(self):
-        if self.recognized_text:
+        # Only copy if not processing and text is not an error/indicator message
+        if not self.processing and self.recognized_text and not self.recognized_text.startswith("OCR Error") and not self.recognized_text.startswith("("):
             pyperclip.copy(self.recognized_text)
-            print("Text copied to clipboard!") # Optional feedback
-            # Maybe add visual feedback like button text change briefly
+            print("Text copied to clipboard!")
+        else:
+             print("Nothing valid to copy.")
 
     def go_back(self):
-        self.game_manager.change_state('main_menu') 
+        self.game_manager.change_state('main_menu')
+
+    # Helper function for text wrapping (add this method to the class)
+    def wrap_text(self, text, font, max_width):
+        words = text.split(' ')
+        lines = []
+        current_line = ""
+        for word in words:
+            # Handle potential newlines within the text itself
+            sub_words = word.split('\n')
+            for i, sub_word in enumerate(sub_words):
+                test_line = current_line + sub_word + " "
+                # Check width
+                if font.size(test_line.strip())[0] <= max_width:
+                    current_line = test_line
+                else:
+                    # Word doesn't fit, start new line
+                    lines.append(current_line.strip())
+                    current_line = sub_word + " "
+                # If there was a newline, force a line break after the sub_word
+                if i < len(sub_words) - 1:
+                     lines.append(current_line.strip())
+                     current_line = "" 
+        lines.append(current_line.strip())
+        return lines 
