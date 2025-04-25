@@ -59,17 +59,6 @@ class WhiteboardPlayground(GameState):
         # Button spacing
         button_spacing = Config.scale_width(20)
 
-        # Clear button - add a direct clear button
-        self.clear_button = Button(
-            Config.scale_width(75),
-            Config.scale_height(10),
-            Config.scale_width(60),
-            Config.scale_height(30),
-            "Clear",
-            self.whiteboard.clear_canvas,
-            font_size=scaled_font_sizes['small']
-        )
-        
         # Back to Menu button - more professional with rounded corners
         self.menu_button = Button(
             Config.scale_width(20),
@@ -84,7 +73,10 @@ class WhiteboardPlayground(GameState):
             rounded=True,
             font_size=scaled_font_sizes['small']
         )
-    
+        
+        # Find the bottom bar UI panel setup
+        # ... (Assume panel_x, panel_y calculations exist) ...
+        
     def handle_event(self, event):
         """Handle pygame events"""
         # Handle dialog events first if active
@@ -105,11 +97,8 @@ class WhiteboardPlayground(GameState):
         # Handle button events
         if event.type == pygame.MOUSEMOTION:
             self.menu_button.update(event.pos)
-            self.clear_button.update(event.pos)
             
         if self.menu_button.handle_event(event):
-            return True
-        if self.clear_button.handle_event(event):
             return True
         
         return False
@@ -121,7 +110,6 @@ class WhiteboardPlayground(GameState):
         
         # Update buttons
         self.menu_button.update(mouse_pos)
-        self.clear_button.update(mouse_pos)
             
         # Update dialog if active
         if self.active_dialog:
@@ -153,7 +141,6 @@ class WhiteboardPlayground(GameState):
         
         # Draw buttons
         self.menu_button.draw(self.screen)
-        self.clear_button.draw(self.screen)
         
         # Draw dialog if active
         if self.active_dialog:
@@ -191,6 +178,11 @@ class WhiteboardPlayground(GameState):
         self.whiteboard.resize(0, Config.scale_height(80), screen_width, screen_height - Config.scale_height(80))
         self._setup_ui()
         
+    # Remove the old clear drawing method if it exists
+    # def _clear_drawing(self): ...
+    # Remove the old confirmation method if it exists
+    # def _show_clear_confirmation(self): ...
+
     # Remove this method as it's handled by returning state name from update
     # def _go_to_menu(self):
     #     self.game_manager.change_state('main_menu') 
