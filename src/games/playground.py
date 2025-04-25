@@ -54,6 +54,24 @@ class WhiteboardPlayground:
         # Header bar
         self.header_rect = pygame.Rect(0, 0, screen_width, Config.scale_height(50))
         
+        # Button spacing
+        button_spacing = Config.scale_width(20)
+
+        # Clear button - add a direct clear button
+        self.clear_button = Button(
+            Config.scale_width(20) + scaled_button_width + button_spacing,
+            screen_height - Config.scale_height(60),
+            scaled_button_width,
+            scaled_button_height,
+            "Clear",
+            self._clear_drawing,
+            bg_color=Config.LIGHT_GRAY,
+            hover_color=Config.GRAY,
+            text_color=Config.BLACK,
+            rounded=True,
+            font_size=scaled_font_sizes['small']
+        )
+        
         # Back to Menu button - more professional with rounded corners
         self.menu_button = Button(
             Config.scale_width(20),
@@ -68,6 +86,21 @@ class WhiteboardPlayground:
             rounded=True,
             font_size=scaled_font_sizes['small']
         )
+    
+    def _clear_drawing(self):
+        """Clear the canvas immediately without confirmation dialog"""
+        # Get the current whiteboard size
+        wb_width, wb_height = self.whiteboard.size
+        
+        # Create a completely new white surface
+        self.whiteboard.drawing_engine.surface = pygame.Surface((wb_width, wb_height))
+        self.whiteboard.drawing_engine.surface.fill(Config.WHITE)
+        
+        # Reset strokes list in drawing engine
+        self.whiteboard.drawing_engine.strokes = []
+        
+        # Add this clear action to the drawing history
+        self.whiteboard.drawing_engine._add_to_history()
             
     def handle_event(self, event):
         """Handle pygame events"""
@@ -86,20 +119,23 @@ class WhiteboardPlayground:
         if self.whiteboard.handle_event(event):
             return
             
-        # Handle menu button events
+        # Handle button events
         if event.type == pygame.MOUSEMOTION:
             self.menu_button.update(event.pos)
+            self.clear_button.update(event.pos)
             
         self.menu_button.handle_event(event)
+        self.clear_button.handle_event(event)
         
     def update(self, mouse_pos=None):
         """Update game state"""
         # Update whiteboard
         self.whiteboard.update(mouse_pos)
         
-        # Update menu button
+        # Update buttons
         if mouse_pos:
             self.menu_button.update(mouse_pos)
+            self.clear_button.update(mouse_pos)
             
         # Update dialog if active
         if self.active_dialog and mouse_pos:
@@ -130,8 +166,9 @@ class WhiteboardPlayground:
         # Draw whiteboard
         self.whiteboard.render()
         
-        # Draw menu button
+        # Draw buttons
         self.menu_button.draw(self.screen)
+        self.clear_button.draw(self.screen)
         
         # Draw dialog if active
         if self.active_dialog:
