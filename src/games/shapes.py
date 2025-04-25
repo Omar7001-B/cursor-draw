@@ -212,6 +212,7 @@ class DrawBasicShapes:
         # Reset tracing state
         self.drawn_points = []
         self.accuracy_tracker.reset()
+        self.accuracy_tracker.set_current_shape(shape_data["name"])
         self.is_tracing = False
         self.shape_completed = False
         self.next_shape_button.disabled = True
@@ -226,8 +227,8 @@ class DrawBasicShapes:
             alpha=100
         )
         
-        # Update the accuracy tracker with the current shape name
-        self.accuracy_tracker.set_current_shape(shape_data["name"])
+        # Add to drawing history
+        self.whiteboard.drawing_engine._add_to_history()
         
     def _back_to_menu_with_check(self):
         """Return to main menu with confirmation if needed"""
@@ -262,7 +263,12 @@ class DrawBasicShapes:
         # Reset drawn points and tracing state
         self.drawn_points = []
         self.is_tracing = False
+        
+        # Reset and update the accuracy tracker
         self.accuracy_tracker.reset()
+        self.accuracy_tracker.set_current_shape(self.shapes_data[self.current_shape_index]["name"])
+        
+        # Update button state
         self.next_shape_button.disabled = not self.shape_completed
         
         # Redraw the shape outline
@@ -273,9 +279,6 @@ class DrawBasicShapes:
             width=4,
             alpha=100
         )
-        
-        # Set the current shape name in the accuracy tracker
-        self.accuracy_tracker.set_current_shape(self.shapes_data[self.current_shape_index]["name"])
         
         # Add this clear action to the drawing history
         self.whiteboard.drawing_engine._add_to_history()
