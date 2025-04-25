@@ -12,7 +12,11 @@ from src.config import Config
 class TextConverterGame(GameState):
     def __init__(self, screen, game_manager):
         super().__init__(screen, game_manager)
-        self.whiteboard = Whiteboard(0, 50, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT - 150, show_controls=False)
+        # Define position and size as tuples
+        whiteboard_pos = (0, 50)
+        whiteboard_size = (Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT - 150)
+        # Pass tuples to Whiteboard constructor
+        self.whiteboard = Whiteboard(screen, whiteboard_pos, whiteboard_size, show_controls=False)
         self.recognized_text = ""
         self.text_display_rect = pygame.Rect(10, Config.SCREEN_HEIGHT - 90, Config.SCREEN_WIDTH - 120, 80)
         self.copy_button = Button(Config.SCREEN_WIDTH - 110, Config.SCREEN_HEIGHT - 70, 100, 40, "Copy", self.copy_text)
