@@ -36,34 +36,35 @@ class TextConverterGame(GameState):
     def handle_event(self, event):
         # Handle custom OCR complete event first
         if event.type == OCR_COMPLETE:
-             self.recognized_text = event.result # Get result from event dictionary
-             self.processing = False # Reset processing flag
-             print(f"OCR Event Received: {event.result}") # Debugging
-             return True # Event handled
+             self.recognized_text = event.result
+             self.processing = False
+             print(f"OCR Event Received: {event.result}")
+             return True 
 
-        # Handle buttons first if they are outside the whiteboard area
+        # Handle buttons first (allow even if processing)
         button_handled = False
         if self.copy_button.handle_event(event):
             button_handled = True
-        # Only handle back button if OCR is not processing
-        if not self.processing and self.back_button.handle_event(event):
-            button_handled = True
+        if self.back_button.handle_event(event):
+            button_handled = True # Allow back button even if processing?
+            # If back button is clicked, maybe we should handle canceling the OCR thread?
+            # For now, allow it.
             
         if button_handled:
              return True
 
-        # Handle whiteboard events only if OCR is not processing
-        whiteboard_handled = False
-        if not self.processing:
-            whiteboard_handled = self.whiteboard.handle_event(event)
+        # Always handle whiteboard events (drawing should not be blocked)
+        whiteboard_handled = self.whiteboard.handle_event(event)
 
-            # Check if drawing stopped specifically via MOUSEBUTTONUP
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                if whiteboard_handled and not self.whiteboard.drawing_engine.is_drawing: 
+        # Trigger OCR *only* if drawing stopped AND OCR is not already processing
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if whiteboard_handled and not self.whiteboard.drawing_engine.is_drawing: 
+                if not self.processing: # Only start if not already processing
                     self.recognize_drawing() 
-                    # Don't return True here, let whiteboard_handled control the return
+                else:
+                     print("OCR already in progress, skipping new request.") # Optional debug msg
 
-        return whiteboard_handled # Return True if whiteboard handled anything
+        return whiteboard_handled # Return True if whiteboard handled the event
 
     def update(self, dt):
         self.whiteboard.update(dt)
