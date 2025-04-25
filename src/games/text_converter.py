@@ -170,19 +170,16 @@ class TextConverterGame(GameState):
         self.game_manager.change_state('main_menu')
 
     def clear_whiteboard_and_text(self):
-        """Clears the whiteboard drawing and the recognized text."""
-        print("Clear button clicked - attempting to clear engine canvas.")
+        """Clears the whiteboard drawing and the recognized text using direct surface fill."""
+        print("Clear button clicked - filling engine surface directly.") # Updated debug print
         engine = self.whiteboard.drawing_engine
-        engine.clear_canvas(animated=False) 
         
-        # --- Diagnostic Step: Force render immediately after clear --- 
-        # self.whiteboard.render() 
-        # It's generally better practice to let the main draw loop handle this,
-        # but if the above doesn't work, we need to ensure the surface is 
-        # actually cleared visually immediately.
-        # Let's try forcing the blit directly here to be sure:
-        self.screen.blit(engine.surface, self.whiteboard.pos)
-        # -----------------------------------------------------------
+        # --- Direct Clear Logic (mimicking shapes.py) --- 
+        # 1. Fill the surface directly
+        engine.surface.fill(engine.bg_color) # Use engine's background color
+        # 2. Add this cleared state to history (for potential undo)
+        engine._add_to_history()
+        # --------------------------------------------------
         
         self.recognized_text = "" # Clear the text display
         self.processing = False # Ensure processing stops if clear is hit mid-process
