@@ -187,11 +187,12 @@ class DrawBasicShapes:
         # Get current shape data
         shape_data = self.shapes_data[self.current_shape_index]
         
-        # Clear the whiteboard first to ensure old drawings and shapes are gone
-        self.whiteboard.drawing_engine.clear_canvas()
-        
         # Get whiteboard dimensions
         wb_width, wb_height = self.whiteboard.size
+        
+        # Create a completely new white surface
+        self.whiteboard.drawing_engine.surface = pygame.Surface((wb_width, wb_height))
+        self.whiteboard.drawing_engine.surface.fill(Config.WHITE)
         
         # Calculate an appropriate size for the shape (based on whiteboard)
         base_size = min(wb_width, wb_height) // 3
@@ -257,8 +258,12 @@ class DrawBasicShapes:
     
     def _clear_drawing(self):
         """Clear the current drawing but keep the shape outline"""
-        # First create a new blank surface by filling with white
-        self.whiteboard.drawing_engine.clear_canvas()
+        # Get the current whiteboard size
+        wb_width, wb_height = self.whiteboard.size
+        
+        # Create a completely new white surface
+        self.whiteboard.drawing_engine.surface = pygame.Surface((wb_width, wb_height))
+        self.whiteboard.drawing_engine.surface.fill(Config.WHITE)
         
         # Reset drawn points and tracing state
         self.drawn_points = []
