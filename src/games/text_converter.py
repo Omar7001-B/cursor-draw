@@ -171,14 +171,16 @@ class TextConverterGame(GameState):
 
     def clear_whiteboard_and_text(self):
         """Clears the whiteboard drawing and the recognized text."""
-        print("Clear button clicked - attempting to clear engine canvas.") # Debug print
+        print("Clear button clicked - attempting to clear engine canvas.")
         engine = self.whiteboard.drawing_engine
-        engine.clear_canvas(animated=False) # Explicitly call clear on the engine
-        # Ensure the whiteboard's reference to the surface is implicitly updated
-        # (it should be, as it holds the engine object)
+        engine.clear_canvas(animated=False) 
         
-        self.recognized_text = "" # Clear the text display
-        self.processing = False # Ensure processing stops if clear is hit mid-process
+        # Force a refresh/redraw or state update within whiteboard?
+        # Let's try resetting the size - might trigger internal refresh (unlikely needed)
+        self.whiteboard.size = self.whiteboard.size 
+        
+        self.recognized_text = ""
+        self.processing = False
 
     # Helper function for text wrapping (add this method to the class)
     def wrap_text(self, text, font, max_width):
