@@ -117,15 +117,14 @@ class WhiteboardPlayground(GameState):
     def update(self, dt):
         """Update game state"""
         mouse_pos = pygame.mouse.get_pos()
-        self.whiteboard.update(dt)
+        self.whiteboard.update(mouse_pos=mouse_pos)
         
         # Update buttons
-        if mouse_pos:
-            self.menu_button.update(mouse_pos)
-            self.clear_button.update(mouse_pos)
+        self.menu_button.update(mouse_pos)
+        self.clear_button.update(mouse_pos)
             
         # Update dialog if active
-        if self.active_dialog and mouse_pos:
+        if self.active_dialog:
             self.active_dialog.update(mouse_pos)
             
         # Return next screen name if set

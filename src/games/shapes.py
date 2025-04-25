@@ -18,10 +18,9 @@ class DrawBasicShapes(GameState):
         super().__init__(screen, game_manager)
         self.screen = screen
         self.game_manager = game_manager
-        self.next_screen = None
         self.active_dialog = None
-        self.next_screen_name = None # Use state name
-        self.request_menu_exit = False # Use a flag
+        self.next_screen_name = None
+        self.request_menu_exit = False
         
         # Difficulty settings - tolerance for accuracy (higher = easier)
         self.difficulty_settings = {
@@ -79,8 +78,7 @@ class DrawBasicShapes(GameState):
             self.screen,
             (whiteboard_x, whiteboard_y),
             (whiteboard_width, whiteboard_height),
-            self.game_manager,
-            show_controls=False  # Hide controls for cleaner tracing experience
+            show_controls=False
         )
         
         # Title
@@ -179,7 +177,7 @@ class DrawBasicShapes(GameState):
             button_width,
             scaled_button_height,
             "Back to Menu",
-            self._back_to_menu_with_check,
+            self._request_menu_exit,
             bg_color=Config.BLUE,
             hover_color=(100, 150, 255),
             text_color=Config.WHITE,
@@ -244,16 +242,6 @@ class DrawBasicShapes(GameState):
         self.accuracy_panel_size = (
             accuracy_panel_width,
             Config.scale_height(320)  # Slightly taller for more information
-        )
-        
-        self.back_button = Button(
-             self.accuracy_panel_pos[0] + button_margin, 
-             self.accuracy_panel_pos[1] + button_spacing, 
-             button_width, 
-             button_height, 
-             "Back", 
-             self._go_back,
-             font_size=Config.get_scaled_font_sizes()['small']
         )
         
     def _set_difficulty(self, difficulty):
@@ -345,7 +333,7 @@ class DrawBasicShapes(GameState):
         # Add to drawing history
         self.whiteboard.drawing_engine._add_to_history()
         
-    def _back_to_menu_with_check(self):
+    def _request_menu_exit(self):
         """Return to main menu with confirmation if needed"""
         # Only show confirmation if user has started tracing
         if len(self.drawn_points) > 0 and not self.shape_completed:
@@ -487,30 +475,19 @@ class DrawBasicShapes(GameState):
         
         # Handle resize event
         if event.type == pygame.VIDEORESIZE:
-            # Recreate UI elements when window is resized
-            self._setup_ui()
-            self._generate_current_shape()  # Regenerate shape with new dimensions
+            self.handle_resize()
             return True
         
         # Handle button events
-        if event.type == pygame.MOUSEMOTION:
-            self.menu_button.update(event.pos)
-            self.clear_button.update(event.pos)
-            self.next_shape_button.update(event.pos)
-            self.random_shape_button.update(event.pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(event.pos)
-            
-        self.menu_button.handle_event(event)
-        self.clear_button.handle_event(event)
-        self.next_shape_button.handle_event(event)
-        self.random_shape_button.handle_event(event)
-        
-        # Handle difficulty button events
+        button_handled = False
+        if self.menu_button.handle_event(event): button_handled = True
+        if self.clear_button.handle_event(event): button_handled = True
+        if self.random_shape_button.handle_event(event): button_handled = True
+        if self.next_shape_button.handle_event(event): button_handled = True
         for button in self.difficulty_buttons.values():
-            button.handle_event(event)
+            if button.handle_event(event): button_handled = True
+        
+        if button_handled: return True
         
         # Handle drawing events
         canvas_rect = pygame.Rect(
@@ -560,9 +537,6 @@ class DrawBasicShapes(GameState):
                 if len(self.drawn_points) > 0:
                     self._evaluate_tracing(is_final=True)
         
-        if self.back_button.handle_event(event):
-            return True
-        
         return False
 
     def update(self, dt):
@@ -574,8 +548,8 @@ class DrawBasicShapes(GameState):
         mouse_pos = pygame.mouse.get_pos()
         self.menu_button.update(mouse_pos)
         self.clear_button.update(mouse_pos)
-        self.next_shape_button.update(mouse_pos)
         self.random_shape_button.update(mouse_pos)
+        self.next_shape_button.update(mouse_pos)
         
         # Update difficulty buttons
         for button in self.difficulty_buttons.values():
@@ -637,16 +611,19 @@ class DrawBasicShapes(GameState):
         self.clear_button.draw(self.screen)
         self.random_shape_button.draw(self.screen)
         self.next_shape_button.draw(self.screen)
-        self.back_button.draw(self.screen)
         
         # Draw dialog if active
         if self.active_dialog:
             self.active_dialog.draw()
         
+    def handle_resize(self):
+         self._setup_ui()
+         self._generate_current_shape() # Regenerate shape
+         
     def _go_back(self):
         # This method is likely called by the back button
         # Check if content exists before setting flag
-        self._back_to_menu_with_check()
+        self._request_menu_exit()
 
     def handle_resize(self):
          # Recalculate layout and re-setup UI

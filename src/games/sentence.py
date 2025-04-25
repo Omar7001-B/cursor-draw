@@ -6,6 +6,7 @@ from src.core.whiteboard import Whiteboard
 from src.utils.text_path_generator import TextPathGenerator
 from src.utils.path_detection import PathDetection
 from src.core.game_state import GameState
+from src.utils.accuracy import AccuracyTracker
 
 class TraceTheSentence(GameState):
     """
