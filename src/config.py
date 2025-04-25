@@ -38,10 +38,13 @@ class Config:
     FONT_DIRECTORY = "src/assets/fonts"
     
     # Game state settings
-    IMPLEMENTED_GAMES = ["Whiteboard Playground", "Draw Basic Shapes"]
-    COMING_SOON_GAMES = [
+    IMPLEMENTED_GAMES = [
+        "Whiteboard Playground",
+        "Draw Basic Shapes",
         "Trace the Letter",
-        "Trace the Number",
+        "Trace the Number"
+    ]
+    COMING_SOON_GAMES = [
         "Trace the Sentence",
         "Whiteboard to Text"
     ]
