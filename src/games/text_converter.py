@@ -113,7 +113,7 @@ class TextConverterGame(GameState):
 
         try:
             # Get the drawing surface from the engine
-            drawing_surface = self.whiteboard.drawing_engine.drawing_surface
+            drawing_surface = self.whiteboard.drawing_engine.surface
             
             # Convert Pygame surface to PIL Image
             img_str = pygame.image.tostring(drawing_surface, 'RGB')
