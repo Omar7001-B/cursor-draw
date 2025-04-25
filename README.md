@@ -46,6 +46,8 @@ cd cursor-draw
 pip install -r requirements.txt
 ```
 
+**Note:** The "Whiteboard to Text" game requires the Tesseract OCR engine to be installed on your system. Please see the [Tesseract installation guide](https://github.com/tesseract-ocr/tessdoc/blob/main/Installation.md) for instructions specific to your operating system.
+
 3. Run the application:
 ```bash
 python run.py

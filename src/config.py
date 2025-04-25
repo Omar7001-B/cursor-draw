@@ -43,10 +43,11 @@ class Config:
         "Draw Basic Shapes",
         "Trace the Letter",
         "Trace the Number",
-        "Trace the Sentence"
+        "Trace the Sentence",
+        "Whiteboard to Text"
     ]
     COMING_SOON_GAMES = [
-        "Whiteboard to Text"
+        # No games coming soon currently
     ]
     
     @classmethod
