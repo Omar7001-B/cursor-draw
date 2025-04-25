@@ -29,7 +29,30 @@ class LetterPathGenerator:
             # Default to a simple vertical line if letter not implemented
             return LetterPathGenerator._generate_default(center, size)
             
-        return generator_method(center, size)
+        # Generate the base path
+        base_path = generator_method(center, size)
+        
+        # Add intermediate points to make the path smoother
+        smoothed_path = []
+        for i in range(len(base_path) - 1):
+            p1 = base_path[i]
+            p2 = base_path[i + 1]
+            
+            # Add the first point
+            smoothed_path.append(p1)
+            
+            # Add intermediate points
+            num_points = 5  # Number of points to add between each pair
+            for j in range(1, num_points):
+                t = j / num_points
+                x = int(p1[0] * (1 - t) + p2[0] * t)
+                y = int(p1[1] * (1 - t) + p2[1] * t)
+                smoothed_path.append((x, y))
+                
+        # Add the last point
+        smoothed_path.append(base_path[-1])
+        
+        return smoothed_path
     
     @staticmethod
     def _generate_default(center: Tuple[int, int], size: int) -> List[Tuple[int, int]]:
