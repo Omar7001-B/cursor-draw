@@ -50,7 +50,7 @@ class TextConverterGame(GameState):
 
     def draw(self):
         self.screen.fill(Config.WHITE)
-        self.whiteboard.draw()
+        self.whiteboard.render()
 
         # Draw text display area
         pygame.draw.rect(self.screen, Config.GRAY, self.text_display_rect, 2, border_radius=5)
