@@ -217,6 +217,18 @@ class DrawBasicShapes:
         self.next_shape_button.disabled = True
         self.auto_progress_timer = None
         
+        # Draw the shape outline
+        PathDetection.draw_shape_outline(
+            self.whiteboard.drawing_engine.surface,
+            self.current_shape_points,
+            Config.BLUE,
+            width=4,
+            alpha=100
+        )
+        
+        # Update the accuracy tracker with the current shape name
+        self.accuracy_tracker.set_current_shape(shape_data["name"])
+        
     def _back_to_menu_with_check(self):
         """Return to main menu with confirmation if needed"""
         # Only show confirmation if user has started tracing
@@ -243,11 +255,11 @@ class DrawBasicShapes:
             self.next_screen = MainMenu(self.screen, self.game_state)
     
     def _clear_drawing(self):
-        """Clear the current drawing"""
+        """Clear the current drawing but keep the shape outline"""
         # First create a new blank surface by filling with white
         self.whiteboard.drawing_engine.clear_canvas()
         
-        # Reset all state
+        # Reset drawn points and tracing state
         self.drawn_points = []
         self.is_tracing = False
         self.accuracy_tracker.reset()
@@ -262,6 +274,9 @@ class DrawBasicShapes:
             alpha=100
         )
         
+        # Set the current shape name in the accuracy tracker
+        self.accuracy_tracker.set_current_shape(self.shapes_data[self.current_shape_index]["name"])
+        
         # Add this clear action to the drawing history
         self.whiteboard.drawing_engine._add_to_history()
     
@@ -269,7 +284,7 @@ class DrawBasicShapes:
         """Proceed to the next shape"""
         if self.shape_completed:
             self.current_shape_index += 1
-            # Clear whiteboard before generating new shape
+            # Clear whiteboard and regenerate shape
             self._generate_current_shape()
             
     def _random_shape(self):
@@ -286,7 +301,7 @@ class DrawBasicShapes:
             # If only one shape, just restart it
             pass
             
-        # Clear whiteboard and generate the new shape
+        # Generate the new shape with a clear whiteboard
         self._generate_current_shape()
     
     def _evaluate_tracing(self, is_final=False):
@@ -461,14 +476,8 @@ class DrawBasicShapes:
         # Draw whiteboard
         self.whiteboard.render()
         
-        # Draw the shape outline on the whiteboard surface
-        PathDetection.draw_shape_outline(
-            self.whiteboard.drawing_engine.surface,
-            self.current_shape_points,
-            Config.BLUE,
-            width=4,
-            alpha=100
-        )
+        # We no longer need to draw the shape outline here as it's drawn
+        # directly on the whiteboard surface when generated or cleared
         
         # Draw accuracy panel
         self.accuracy_tracker.draw_accuracy_panel(
