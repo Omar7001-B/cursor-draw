@@ -130,10 +130,14 @@ class Whiteboard:
             self._resize()
             return True
             
-        # Handle Ctrl+Z for undo
+        # Handle Ctrl+Z for undo and Ctrl+Shift+Z for redo
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_z and pygame.key.get_mods() & pygame.KMOD_CTRL:
-                self.drawing_engine.undo()
+                # Check if Shift is also pressed for redo
+                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    self.drawing_engine.redo()
+                else:
+                    self.drawing_engine.undo()
                 return True
             
         # Handle UI events if controls are shown
