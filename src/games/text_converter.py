@@ -3,11 +3,15 @@ import pytesseract
 import pyperclip
 from PIL import Image
 import io
+import threading # Import threading
 
 from src.core.game_state import GameState
 from src.core.whiteboard import Whiteboard
 from src.core.ui_manager import Button
 from src.config import Config
+
+# Define custom event type
+OCR_COMPLETE = pygame.USEREVENT + 1
 
 class TextConverterGame(GameState):
     def __init__(self, screen, game_manager):
@@ -30,34 +34,36 @@ class TextConverterGame(GameState):
         # pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
     def handle_event(self, event):
+        # Handle custom OCR complete event first
+        if event.type == OCR_COMPLETE:
+             self.recognized_text = event.result # Get result from event dictionary
+             self.processing = False # Reset processing flag
+             print(f"OCR Event Received: {event.result}") # Debugging
+             return True # Event handled
+
         # Handle buttons first if they are outside the whiteboard area
         button_handled = False
         if self.copy_button.handle_event(event):
             button_handled = True
-        if self.back_button.handle_event(event):
+        # Only handle back button if OCR is not processing
+        if not self.processing and self.back_button.handle_event(event):
             button_handled = True
             
         if button_handled:
              return True
 
-        # Handle whiteboard events AFTER checking buttons outside its area
-        whiteboard_handled = self.whiteboard.handle_event(event)
+        # Handle whiteboard events only if OCR is not processing
+        whiteboard_handled = False
+        if not self.processing:
+            whiteboard_handled = self.whiteboard.handle_event(event)
 
-        # Check if drawing stopped specifically via MOUSEBUTTONUP
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            # Check a flag or state within drawing_engine that indicates it *was* drawing
-            # Let's assume whiteboard.handle_event correctly calls stop_drawing 
-            # and returns True if it was drawing and stopped.
-            # We need to ensure whiteboard.handle_event behaves this way.
-            # For now, let's trigger based on the event if whiteboard handled it.
-            if whiteboard_handled:
-                 # Check if whiteboard is not currently drawing (meaning it just stopped)
-                 # This is still a bit indirect. A better way might be needed in Whiteboard itself.
-                 if not self.whiteboard.drawing_engine.is_drawing: 
-                      self.recognize_drawing() 
-                      return True # OCR triggered, event handled
+            # Check if drawing stopped specifically via MOUSEBUTTONUP
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if whiteboard_handled and not self.whiteboard.drawing_engine.is_drawing: 
+                    self.recognize_drawing() 
+                    # Don't return True here, let whiteboard_handled control the return
 
-        return whiteboard_handled # Return True if whiteboard handled anything else
+        return whiteboard_handled # Return True if whiteboard handled anything
 
     def update(self, dt):
         self.whiteboard.update(dt)
@@ -103,52 +109,50 @@ class TextConverterGame(GameState):
         self.copy_button.draw(self.screen)
         self.back_button.draw(self.screen)
 
+    def _perform_ocr(self, surface_copy):
+        """Function to run OCR in a background thread."""
+        ocr_result = ""
+        try:
+            # Convert Pygame surface to PIL Image
+            img_str = pygame.image.tostring(surface_copy, 'RGB')
+            img_pil = Image.frombytes('RGB', surface_copy.get_size(), img_str)
+
+            # Perform OCR
+            recognized = pytesseract.image_to_string(img_pil, config='--psm 6').strip()
+            
+            if not recognized:
+                 ocr_result = "(No text detected)"
+            else:
+                 ocr_result = recognized
+                 
+            print(f"OCR Thread Recognized Text: {ocr_result}") # For debugging
+
+        except pytesseract.TesseractNotFoundError:
+             ocr_result = "OCR Error: Tesseract not found. Check installation/path."
+             print("OCR Thread Error: Tesseract not found.")
+        except Exception as e:
+            ocr_result = f"OCR Error: {type(e).__name__}"
+            print(f"OCR Thread Error: {e}")
+        finally:
+            # Post custom event with the result
+            pygame.event.post(pygame.event.Event(OCR_COMPLETE, {'result': ocr_result}))
+
     def recognize_drawing(self):
         if self.processing: # Prevent overlapping calls
              return
              
         self.processing = True
-        self.recognized_text = "Processing..." # Set indicator text immediately
-        # We don't force a draw here, the main loop will handle it
+        self.recognized_text = "Processing..." # Set indicator text
 
-        try:
-            # Get the drawing surface from the engine
-            drawing_surface = self.whiteboard.drawing_engine.surface
-            
-            # Convert Pygame surface to PIL Image
-            img_str = pygame.image.tostring(drawing_surface, 'RGB')
-            img_pil = Image.frombytes('RGB', drawing_surface.get_size(), img_str)
-            
-            # --- Optional: Check Tesseract version to ensure it's found ---
-            # try:
-            #     pytesseract.get_tesseract_version()
-            # except pytesseract.TesseractNotFoundError:
-            #      self.recognized_text = "OCR Error: Tesseract not found. Check install/path."
-            #      self.processing = False
-            #      return 
-            # -------------------------------------------------------------
+        # Get a *copy* of the surface to pass to the thread
+        # This avoids potential issues with the main thread modifying the surface
+        surface_to_process = self.whiteboard.drawing_engine.surface.copy()
 
-            # Perform OCR using pytesseract
-            recognized = pytesseract.image_to_string(img_pil, config='--psm 6').strip()
-            
-            if not recognized:
-                 self.recognized_text = "(No text detected)"
-            else:
-                 self.recognized_text = recognized
-                 
-            print(f"Recognized Text: {self.recognized_text}") # For debugging
-
-        except pytesseract.TesseractNotFoundError:
-             # Specific error for Tesseract not being found
-             self.recognized_text = "OCR Error: Tesseract not found. Check installation/path."
-             print("Error during OCR: Tesseract not found.")
-        except Exception as e:
-            # Catch other potential errors during OCR
-            self.recognized_text = f"OCR Error: {type(e).__name__}"
-            print(f"Error during OCR: {e}")
-        finally:
-            # Ensure processing flag is always reset
-            self.processing = False
+        # Create and start the OCR thread
+        ocr_thread = threading.Thread(target=self._perform_ocr, args=(surface_to_process,))
+        ocr_thread.start()
+        # We don't join() the thread here, as that would block
+        # The result will come back via the OCR_COMPLETE event
 
     def copy_text(self):
         # Only copy if not processing and text is not an error/indicator message
