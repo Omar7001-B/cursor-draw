@@ -8,16 +8,19 @@ from src.core.ui_manager import Button, Label, Dialog
 from src.utils.path_detection import PathDetection
 from src.utils.accuracy import AccuracyTracker
 from src.utils.letter_path_generator import LetterPathGenerator
+from src.core.game_state import GameState
 
-class TraceTheLetter:
+class TraceTheLetter(GameState):
     """
     Trace the Letter - A game where users trace over letter guides to improve precision.
     """
-    def __init__(self, screen, game_state):
+    def __init__(self, screen, game_manager):
+        super().__init__(screen, game_manager)
         self.screen = screen
-        self.game_state = game_state
-        self.next_screen = None
+        self.game_manager = game_manager
+        self.next_screen_name = None
         self.active_dialog = None
+        self.request_menu_exit = False
         
         # Difficulty settings - tolerance for accuracy (higher = easier)
         self.difficulty_settings = {
@@ -80,8 +83,7 @@ class TraceTheLetter:
             self.screen,
             (whiteboard_x, whiteboard_y),
             (whiteboard_width, whiteboard_height),
-            self.game_state,
-            show_controls=False  # Hide controls for cleaner tracing experience
+            show_controls=False
         )
         
         # Title
@@ -176,7 +178,7 @@ class TraceTheLetter:
             button_width,
             scaled_button_height,
             "Back to Menu",
-            self._back_to_menu_with_check,
+            self._request_menu_exit,
             bg_color=Config.BLUE,
             hover_color=(100, 150, 255),
             text_color=Config.WHITE,
@@ -325,30 +327,12 @@ class TraceTheLetter:
         # Add to drawing history
         self.whiteboard.drawing_engine._add_to_history()
     
-    def _back_to_menu_with_check(self):
-        """Return to main menu with confirmation if needed"""
-        # Only show confirmation if user has started tracing
+    def _request_menu_exit(self):
+        """Sets the flag to request returning to the main menu."""
         if len(self.drawn_points) > 0 and not self.letter_completed:
-            def confirm_exit():
-                self.active_dialog = None
-                from src.screens.main_menu import MainMenu
-                self.next_screen = MainMenu(self.screen, self.game_state)
-                
-            def cancel_exit():
-                self.active_dialog = None
-                
-            self.active_dialog = Dialog(
-                self.screen,
-                "You haven't completed this letter yet.\nAre you sure you want to exit?",
-                confirm_exit,
-                cancel_exit,
-                title="Return to Menu",
-                confirm_text="Yes",
-                cancel_text="No"
-            )
+            self.request_menu_exit = True
         else:
-            from src.screens.main_menu import MainMenu
-            self.next_screen = MainMenu(self.screen, self.game_state)
+            self.request_menu_exit = True
     
     def _clear_drawing(self):
         """Clear the current drawing but keep the letter outline"""
@@ -462,34 +446,21 @@ class TraceTheLetter:
         # Handle dialog events first if active
         if self.active_dialog:
             if self.active_dialog.handle_event(event):
-                return
+                return True
         
         # Handle resize event
         if event.type == pygame.VIDEORESIZE:
-            # Recreate UI elements when window is resized
-            self._setup_ui()
-            self._generate_current_letter()  # Regenerate letter with new dimensions
-            return
+            self.handle_resize()
+            return True
         
         # Handle button events
-        if event.type == pygame.MOUSEMOTION:
-            self.menu_button.update(event.pos)
-            self.clear_button.update(event.pos)
-            self.next_letter_button.update(event.pos)
-            self.random_letter_button.update(event.pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(event.pos)
-            
-        self.menu_button.handle_event(event)
-        self.clear_button.handle_event(event)
-        self.next_letter_button.handle_event(event)
-        self.random_letter_button.handle_event(event)
-        
-        # Handle difficulty button events
+        button_handled = False
+        if self.menu_button.handle_event(event): button_handled = True
+        if self.clear_button.handle_event(event): button_handled = True
+        if self.random_letter_button.handle_event(event): button_handled = True
+        if self.next_letter_button.handle_event(event): button_handled = True
         for button in self.difficulty_buttons.values():
-            button.handle_event(event)
+            if button.handle_event(event): button_handled = True
         
         # Handle drawing events
         canvas_rect = pygame.Rect(
@@ -539,21 +510,23 @@ class TraceTheLetter:
                 if len(self.drawn_points) > 0:
                     self._evaluate_tracing(is_final=True)
         
-    def update(self, mouse_pos=None):
+        return button_handled or False
+        
+    def update(self, dt):
         """Update game state"""
+        mouse_pos = pygame.mouse.get_pos()
+        self.whiteboard.update(dt)
+        
         # Update UI buttons
-        if mouse_pos:
-            self.menu_button.update(mouse_pos)
-            self.clear_button.update(mouse_pos)
-            self.next_letter_button.update(mouse_pos)
-            self.random_letter_button.update(mouse_pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(mouse_pos)
-            
+        self.menu_button.update(mouse_pos)
+        self.clear_button.update(mouse_pos)
+        self.random_letter_button.update(mouse_pos)
+        self.next_letter_button.update(mouse_pos)
+        for button in self.difficulty_buttons.values():
+            button.update(mouse_pos)
+        
         # Update dialog if active
-        if self.active_dialog and mouse_pos:
+        if self.active_dialog:
             self.active_dialog.update(mouse_pos)
             
         # Check for auto-progression timer
@@ -561,15 +534,14 @@ class TraceTheLetter:
             self.auto_progress_timer = None
             self._next_letter()  # Automatically progress to next letter
             
-        # Return next screen if set
-        if self.next_screen:
-            next_screen = self.next_screen
-            self.next_screen = None
-            return next_screen
+        # Check for state transition request
+        if self.request_menu_exit:
+            self.request_menu_exit = False
+            return 'main_menu'
             
         return None
         
-    def render(self):
+    def draw(self):
         """Render the game"""
         # Clear screen
         self.screen.fill(Config.LIGHT_GRAY)
@@ -613,4 +585,11 @@ class TraceTheLetter:
         
         # Draw dialog if active
         if self.active_dialog:
-            self.active_dialog.draw() 
+            self.active_dialog.draw()
+    
+    def handle_resize(self):
+        self._setup_ui()
+        self._generate_current_letter()
+        
+    def render(self):
+        self.draw() 

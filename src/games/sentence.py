@@ -5,17 +5,20 @@ from src.core.ui_manager import Button, Label, Dialog
 from src.core.whiteboard import Whiteboard
 from src.utils.text_path_generator import TextPathGenerator
 from src.utils.path_detection import PathDetection
-from src.utils.accuracy import AccuracyTracker
+from src.core.game_state import GameState
 
-class TraceTheSentence:
+class TraceTheSentence(GameState):
     """
     A game where players trace sentences to improve handwriting and cursor control.
     """
     
-    def __init__(self, screen: pygame.Surface, game_state):
+    def __init__(self, screen: pygame.Surface, game_manager):
+        super().__init__(screen, game_manager)
         self.screen = screen
-        self.game_state = game_state
-        self.next_screen = None
+        self.game_manager = game_manager
+        self.next_screen_name = None
+        self.active_dialog = None
+        self.request_menu_exit = False
         
         # Get screen dimensions
         self.screen_width, self.screen_height = self.screen.get_size()
@@ -88,7 +91,7 @@ class TraceTheSentence:
             self.screen,
             (Config.scale_width(20), header_height + Config.scale_height(60)),  # Position below header
             (whiteboard_width, whiteboard_height),
-            show_controls=False  # Hide default controls
+            show_controls=False
         )
         
         # Create sentence label
@@ -130,7 +133,7 @@ class TraceTheSentence:
             button_width,
             scaled_button_height,
             "Back to Menu",
-            self._back_to_menu,
+            self._request_menu_exit,
             bg_color=Config.BLUE,
             hover_color=(100, 150, 255),
             text_color=Config.WHITE,
@@ -209,9 +212,6 @@ class TraceTheSentence:
                 font_size=scaled_font_sizes['small']
             )
             
-        # Initialize dialog as None
-        self.active_dialog = None
-        
     def _generate_current_sentence(self):
         """Generate the current sentence based on the index"""
         if self.current_sentence_index >= len(self.sentences_data):
@@ -337,10 +337,10 @@ class TraceTheSentence:
             # Reset the current sentence
             self._clear_drawing()
             
-    def _back_to_menu(self):
-        """Return to the main menu"""
-        from src.screens.main_menu import MainMenu
-        self.next_screen = MainMenu(self.screen, self.game_state)
+    def _request_menu_exit(self):
+        """Sets the flag to request returning to the main menu."""
+        # Add confirmation dialog logic if needed
+        self.request_menu_exit = True
         
     def _evaluate_tracing(self, is_final=False):
         """
@@ -396,87 +396,43 @@ class TraceTheSentence:
         
     def handle_event(self, event):
         """Handle pygame events"""
-        if event.type == pygame.VIDEORESIZE:
-            # Recreate UI elements when window is resized
-            self._setup_ui()
-            return
-            
-        # Handle dialog events if active
+        # Handle dialogs first
         if self.active_dialog:
             if self.active_dialog.handle_event(event):
-                return
+                return True
                 
-        # Handle button events
-        self.menu_button.handle_event(event)
-        self.clear_button.handle_event(event)
-        self.next_sentence_button.handle_event(event)
-        self.random_sentence_button.handle_event(event)
-        
-        # Handle difficulty buttons
-        for button in self.difficulty_buttons.values():
-            button.handle_event(event)
+        # Handle resize
+        if event.type == pygame.VIDEORESIZE:
+            self.handle_resize()
+            return True
             
-        # Get whiteboard rect for collision detection
-        canvas_rect = pygame.Rect(
-            self.whiteboard.pos[0],
-            self.whiteboard.pos[1],
-            self.whiteboard.size[0],
-            self.whiteboard.size[1]
-        )
-        
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
-            if canvas_rect.collidepoint(event.pos):
-                # Convert screen coordinates to canvas coordinates
-                canvas_pos = (
-                    event.pos[0] - self.whiteboard.pos[0], 
-                    event.pos[1] - self.whiteboard.pos[1]
-                )
-                self.whiteboard.drawing_engine.start_drawing(canvas_pos)
-                self.is_tracing = True
-                self.drawn_points = [canvas_pos]  # Start tracking points
-                self.point_count = 1
-                self.last_evaluation_time = pygame.time.get_ticks()
-                
-        elif event.type == pygame.MOUSEMOTION:
-            if self.whiteboard.drawing_engine.is_drawing and canvas_rect.collidepoint(event.pos):
-                # Convert screen coordinates to canvas coordinates
-                canvas_pos = (
-                    event.pos[0] - self.whiteboard.pos[0], 
-                    event.pos[1] - self.whiteboard.pos[1]
-                )
-                self.whiteboard.drawing_engine.draw_to(canvas_pos)
-                self.drawn_points.append(canvas_pos)  # Track point for accuracy
-                self.point_count += 1
-                
-                # Only update accuracy every 10 points or after 100ms to reduce performance impact
-                current_time = pygame.time.get_ticks()
-                if (self.point_count >= 10 or (current_time - self.last_evaluation_time) > 100):
-                    self._evaluate_tracing(is_final=False)
-                    self.point_count = 0
-                    self.last_evaluation_time = current_time
-                
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:  # Left release
-            if self.whiteboard.drawing_engine.is_drawing:
-                self.whiteboard.drawing_engine.stop_drawing()
-                self.is_tracing = False
-                
-                # Evaluate the tracing if we have drawn points
-                if len(self.drawn_points) > 0:
+        # Handle Buttons
+        button_handled = False
+        if self.menu_button.handle_event(event): button_handled = True
+        if self.clear_button.handle_event(event): button_handled = True
+        if self.next_sentence_button.handle_event(event): button_handled = True
+        if self.random_sentence_button.handle_event(event): button_handled = True
+        if button_handled: return True
+
+        # Handle whiteboard
+        if self.whiteboard.handle_event(event):
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if not self.whiteboard.drawing_engine.is_drawing:
                     self._evaluate_tracing(is_final=True)
+            return True
+            
+        return False
         
-    def update(self, mouse_pos=None):
+    def update(self, dt):
         """Update game state"""
-        # Update UI buttons
-        if mouse_pos:
-            self.menu_button.update(mouse_pos)
-            self.clear_button.update(mouse_pos)
-            self.next_sentence_button.update(mouse_pos)
-            self.random_sentence_button.update(mouse_pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(mouse_pos)
-            
+        mouse_pos = pygame.mouse.get_pos()
+        self.whiteboard.update(dt)
+        # Update buttons
+        self.menu_button.update(mouse_pos)
+        self.clear_button.update(mouse_pos)
+        self.next_sentence_button.update(mouse_pos)
+        self.random_sentence_button.update(mouse_pos)
+        
         # Update dialog if active
         if self.active_dialog and mouse_pos:
             self.active_dialog.update(mouse_pos)
@@ -486,15 +442,13 @@ class TraceTheSentence:
             self.auto_progress_timer = None
             self._next_sentence()  # Automatically progress to next sentence
             
-        # Return next screen if set
-        if self.next_screen:
-            next_screen = self.next_screen
-            self.next_screen = None
-            return next_screen
-            
+        # Check for state transition request
+        if self.request_menu_exit:
+            self.request_menu_exit = False
+            return 'main_menu'
         return None
         
-    def render(self):
+    def draw(self):
         """Render the game screen"""
         # Clear screen
         self.screen.fill(Config.WHITE)
@@ -533,4 +487,14 @@ class TraceTheSentence:
         
         # Draw dialog if active
         if self.active_dialog:
-            self.active_dialog.draw() 
+            self.active_dialog.draw()
+        
+    def handle_resize(self):
+        self._setup_ui()
+        self._generate_current_sentence()
+        
+    # Remove the redundant render method added previously
+    # def render(self):
+    #     self.draw() 
+
+# End of class 

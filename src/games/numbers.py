@@ -8,16 +8,19 @@ from src.core.ui_manager import Button, Label, Dialog
 from src.utils.path_detection import PathDetection
 from src.utils.accuracy import AccuracyTracker
 from src.utils.number_path_generator import NumberPathGenerator
+from src.core.game_state import GameState
 
-class TraceTheNumber:
+class TraceTheNumber(GameState):
     """
     Trace the Number - A game where users trace over number guides to improve precision.
     """
-    def __init__(self, screen, game_state):
+    def __init__(self, screen, game_manager):
+        super().__init__(screen, game_manager)
         self.screen = screen
-        self.game_state = game_state
-        self.next_screen = None
+        self.game_manager = game_manager
+        self.next_screen_name = None
         self.active_dialog = None
+        self.request_menu_exit = False
         
         # Difficulty settings - tolerance for accuracy (higher = easier)
         self.difficulty_settings = {
@@ -78,8 +81,7 @@ class TraceTheNumber:
             self.screen,
             (whiteboard_x, whiteboard_y),
             (whiteboard_width, whiteboard_height),
-            self.game_state,
-            show_controls=False  # Hide controls for cleaner tracing experience
+            show_controls=False
         )
         
         # Title
@@ -174,7 +176,7 @@ class TraceTheNumber:
             button_width,
             scaled_button_height,
             "Back to Menu",
-            self._back_to_menu_with_check,
+            self._request_menu_exit,
             bg_color=Config.BLUE,
             hover_color=(100, 150, 255),
             text_color=Config.WHITE,
@@ -323,30 +325,10 @@ class TraceTheNumber:
         # Add to drawing history
         self.whiteboard.drawing_engine._add_to_history()
     
-    def _back_to_menu_with_check(self):
-        """Return to main menu with confirmation if needed"""
-        # Only show confirmation if user has started tracing
-        if len(self.drawn_points) > 0 and not self.number_completed:
-            def confirm_exit():
-                self.active_dialog = None
-                from src.screens.main_menu import MainMenu
-                self.next_screen = MainMenu(self.screen, self.game_state)
-                
-            def cancel_exit():
-                self.active_dialog = None
-                
-            self.active_dialog = Dialog(
-                self.screen,
-                "You haven't completed this number yet.\nAre you sure you want to exit?",
-                confirm_exit,
-                cancel_exit,
-                title="Return to Menu",
-                confirm_text="Yes",
-                cancel_text="No"
-            )
-        else:
-            from src.screens.main_menu import MainMenu
-            self.next_screen = MainMenu(self.screen, self.game_state)
+    def _request_menu_exit(self):
+        """Sets the flag to request returning to the main menu."""
+        # Add confirmation dialog logic if needed (similar to TraceTheLetter)
+        self.request_menu_exit = True
     
     def _clear_drawing(self):
         """Clear the current drawing but keep the number outline"""
@@ -460,30 +442,19 @@ class TraceTheNumber:
         # Handle dialog events first if active
         if self.active_dialog:
             if self.active_dialog.handle_event(event):
-                return
+                return True
         
         # Handle resize event
         if event.type == pygame.VIDEORESIZE:
-            # Recreate UI elements when window is resized
-            self._setup_ui()
-            self._generate_current_number()  # Regenerate number with new dimensions
-            return
+            self.handle_resize()
+            return True
         
         # Handle button events
-        if event.type == pygame.MOUSEMOTION:
-            self.menu_button.update(event.pos)
-            self.clear_button.update(event.pos)
-            self.next_number_button.update(event.pos)
-            self.random_number_button.update(event.pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(event.pos)
-            
-        self.menu_button.handle_event(event)
-        self.clear_button.handle_event(event)
-        self.next_number_button.handle_event(event)
-        self.random_number_button.handle_event(event)
+        button_handled = False
+        if self.menu_button.handle_event(event): button_handled = True
+        if self.clear_button.handle_event(event): button_handled = True
+        if self.random_number_button.handle_event(event): button_handled = True
+        if self.next_number_button.handle_event(event): button_handled = True
         
         # Handle difficulty button events
         for button in self.difficulty_buttons.values():
@@ -537,19 +508,17 @@ class TraceTheNumber:
                 if len(self.drawn_points) > 0:
                     self._evaluate_tracing(is_final=True)
         
-    def update(self, mouse_pos=None):
+        return button_handled or self.whiteboard.handle_event(event)
+        
+    def update(self, dt):
         """Update game state"""
-        # Update UI buttons
-        if mouse_pos:
-            self.menu_button.update(mouse_pos)
-            self.clear_button.update(mouse_pos)
-            self.next_number_button.update(mouse_pos)
-            self.random_number_button.update(mouse_pos)
-            
-            # Update difficulty buttons
-            for button in self.difficulty_buttons.values():
-                button.update(mouse_pos)
-            
+        mouse_pos = pygame.mouse.get_pos()
+        self.whiteboard.update(dt)
+        # Update buttons
+        self.menu_button.update(mouse_pos)
+        self.clear_button.update(mouse_pos)
+        self.random_number_button.update(mouse_pos)
+        self.next_number_button.update(mouse_pos)
         # Update dialog if active
         if self.active_dialog and mouse_pos:
             self.active_dialog.update(mouse_pos)
@@ -559,15 +528,13 @@ class TraceTheNumber:
             self.auto_progress_timer = None
             self._next_number()  # Automatically progress to next number
             
-        # Return next screen if set
-        if self.next_screen:
-            next_screen = self.next_screen
-            self.next_screen = None
-            return next_screen
-            
+        # Check for state transition request
+        if self.request_menu_exit:
+            self.request_menu_exit = False
+            return 'main_menu'
         return None
         
-    def render(self):
+    def draw(self):
         """Render the game"""
         # Clear screen
         self.screen.fill(Config.LIGHT_GRAY)
@@ -611,4 +578,14 @@ class TraceTheNumber:
         
         # Draw dialog if active
         if self.active_dialog:
-            self.active_dialog.draw() 
+            self.active_dialog.draw()
+    
+    def handle_resize(self):
+        self._setup_ui()
+        self._generate_current_number()
+        
+    # Remove the redundant render method added previously
+    # def render(self):
+    #     self.draw() 
+
+# End of class 

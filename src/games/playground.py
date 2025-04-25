@@ -149,8 +149,8 @@ class WhiteboardPlayground(GameState):
         self.title_label.draw(self.screen)
         self.title_label.color = title_color_original
         
-        # Draw whiteboard
-        self.whiteboard.draw()
+        # Draw whiteboard using its render method
+        self.whiteboard.render()
         
         # Draw buttons
         self.menu_button.draw(self.screen)
