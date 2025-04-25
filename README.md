@@ -2,6 +2,14 @@
 
 A dynamic and interactive drawing application built with Python and Pygame, designed to help users improve their drawing skills through various engaging games and exercises.
 
+![image](https://github.com/user-attachments/assets/64330f40-46ec-4691-9468-a9987e82da97)
+![image](https://github.com/user-attachments/assets/4cfd6d4b-23ec-4621-be08-363a662506ba)
+![image](https://github.com/user-attachments/assets/bb2595e9-4e1a-48bf-885b-475477b6e09d)
+![image](https://github.com/user-attachments/assets/be10dbfd-1ecb-4aa1-acbc-88c65ee264a7)
+
+
+
+
 ## 🌟 Features
 
 ### Drawing Games
@@ -79,6 +87,12 @@ cursor-draw/
 - **Accuracy Tracker**: Provides real-time feedback on drawing accuracy
 - **Path Detection**: Implements shape and pattern recognition algorithms
 - **Game Manager**: Coordinates game states and progression
+
+## 📽️ Contributing
+https://github.com/user-attachments/assets/c823fad4-0ddc-432c-b267-d3c086de3396
+
+
+
 
 ## 🤝 Contributing
 
