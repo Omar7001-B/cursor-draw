@@ -6,7 +6,7 @@ import io
 
 from src.core.game_state import GameState
 from src.core.whiteboard import Whiteboard
-from src.ui.button import Button
+from src.core.ui_manager import Button
 from src.config import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, BLACK, GRAY
 
 class TextConverterGame(GameState):
