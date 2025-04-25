@@ -541,10 +541,6 @@ class DrawBasicShapes(GameState):
 
     def update(self, dt):
         """Update game state"""
-        # Update UI buttons
-        if self.whiteboard.handle_event(event):
-            return True
-        
         mouse_pos = pygame.mouse.get_pos()
         self.menu_button.update(mouse_pos)
         self.clear_button.update(mouse_pos)
