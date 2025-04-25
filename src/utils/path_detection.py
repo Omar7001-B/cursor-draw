@@ -236,6 +236,34 @@ class PathDetection:
                 (cx, cy + size),       # Bottom
                 (cx - size, cy)        # Left
             ]
+        
+        elif shape_type == "hexagon":
+            # Generate a regular hexagon
+            points = []
+            for i in range(6):
+                angle = 2 * math.pi * i / 6
+                x = cx + size * math.cos(angle)
+                y = cy + size * math.sin(angle)
+                points.append((int(x), int(y)))
+            return points
+            
+        elif shape_type == "star":
+            # Generate a 5-pointed star
+            points = []
+            # Outer points (5 vertices of the star)
+            for i in range(5):
+                angle = (2 * math.pi * i / 5) - math.pi/2  # Start from top
+                x = cx + size * math.cos(angle)
+                y = cy + size * math.sin(angle)
+                points.append((int(x), int(y)))
+                
+                # Inner points (create the star effect)
+                inner_angle = angle + math.pi/5
+                inner_size = size * 0.4  # Inner radius is 40% of outer
+                inner_x = cx + inner_size * math.cos(inner_angle)
+                inner_y = cy + inner_size * math.sin(inner_angle)
+                points.append((int(inner_x), int(inner_y)))
+            return points
             
         else:
             # Default to circle if shape is not recognized
@@ -255,18 +283,25 @@ class PathDetection:
             width: Line width in pixels
             alpha: Transparency level (0-255)
         """
-        if len(shape_points) < 2:
-            return
-            
-        # Create a temporary surface for the shape with transparency
-        temp_surface = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
-        
-        # Draw the shape on the temporary surface
-        if len(shape_points) > 2:
-            pygame.draw.polygon(temp_surface, (*color, alpha), shape_points, width)
+        # Create a transparent surface for drawing
+        if alpha < 255:
+            # Use a separate surface for transparency
+            temp_surface = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            draw_surface = temp_surface
+            draw_color = (*color, alpha)  # Add alpha channel
         else:
-            # For just two points, draw a line
-            pygame.draw.line(temp_surface, (*color, alpha), shape_points[0], shape_points[1], width)
+            draw_surface = surface
+            draw_color = color
             
-        # Blit the temporary surface onto the main surface
-        surface.blit(temp_surface, (0, 0)) 
+        # Draw the shape as a polygon
+        if len(shape_points) > 2:
+            pygame.draw.polygon(draw_surface, draw_color, shape_points, width)
+            
+        # Draw individual points (useful for debugging or small number of points)
+        if len(shape_points) <= 10:
+            for point in shape_points:
+                pygame.draw.circle(draw_surface, draw_color, point, max(width, 3))
+                
+        # Blend the surfaces if using transparency
+        if alpha < 255:
+            surface.blit(temp_surface, (0, 0)) 
