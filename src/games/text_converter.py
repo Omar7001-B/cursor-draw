@@ -25,6 +25,7 @@ class TextConverterGame(GameState):
         self.text_display_rect = pygame.Rect(10, Config.SCREEN_HEIGHT - 90, Config.SCREEN_WIDTH - 120, 80)
         self.copy_button = Button(Config.SCREEN_WIDTH - 110, Config.SCREEN_HEIGHT - 70, 100, 40, "Copy", self.copy_text)
         self.back_button = Button(10, 10, 100, 30, "Back", self.go_back)
+        self.clear_button = Button(120, 10, 100, 30, "Clear", self.clear_whiteboard_and_text)
         self.font = pygame.font.Font(None, 24)
         self.large_font = pygame.font.Font(None, 32)
         self.processing = False # Flag to indicate OCR is running
@@ -46,10 +47,10 @@ class TextConverterGame(GameState):
         if self.copy_button.handle_event(event):
             button_handled = True
         if self.back_button.handle_event(event):
-            button_handled = True # Allow back button even if processing?
-            # If back button is clicked, maybe we should handle canceling the OCR thread?
-            # For now, allow it.
-            
+            button_handled = True 
+        if self.clear_button.handle_event(event):
+             button_handled = True
+             
         if button_handled:
              return True
 
@@ -72,6 +73,7 @@ class TextConverterGame(GameState):
         mouse_pos = pygame.mouse.get_pos()
         self.copy_button.update(mouse_pos)
         self.back_button.update(mouse_pos)
+        self.clear_button.update(mouse_pos)
         # Return None as this state doesn't trigger changes via update
         return None
 
@@ -109,6 +111,7 @@ class TextConverterGame(GameState):
 
         self.copy_button.draw(self.screen)
         self.back_button.draw(self.screen)
+        self.clear_button.draw(self.screen)
 
     def _perform_ocr(self, surface_copy):
         """Function to run OCR in a background thread."""
@@ -165,6 +168,12 @@ class TextConverterGame(GameState):
 
     def go_back(self):
         self.game_manager.change_state('main_menu')
+
+    def clear_whiteboard_and_text(self):
+        """Clears the whiteboard drawing and the recognized text."""
+        self.whiteboard.clear_canvas() # Ask the whiteboard component to clear itself
+        self.recognized_text = "" # Clear the text display
+        self.processing = False # Ensure processing stops if clear is hit mid-process
 
     # Helper function for text wrapping (add this method to the class)
     def wrap_text(self, text, font, max_width):
