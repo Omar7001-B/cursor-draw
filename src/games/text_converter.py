@@ -45,8 +45,12 @@ class TextConverterGame(GameState):
 
     def update(self, dt):
         self.whiteboard.update(dt)
-        self.copy_button.update(dt)
-        self.back_button.update(dt)
+        # Get mouse position for UI elements
+        mouse_pos = pygame.mouse.get_pos()
+        self.copy_button.update(mouse_pos)
+        self.back_button.update(mouse_pos)
+        # Return None as this state doesn't trigger changes via update
+        return None
 
     def draw(self):
         self.screen.fill(Config.WHITE)
