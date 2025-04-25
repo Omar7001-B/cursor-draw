@@ -62,50 +62,61 @@ class GameStateManager:
         else:
             print(f"Warning: State '{state_name}' not registered.")
             # Fallback or error handling
-            # For now, maybe default to main menu if available
             if 'main_menu' in self.states and state_name != 'main_menu':
                 self.change_state('main_menu')
             else:
-                 # If main_menu itself fails, something is wrong
                  print(f"Error: Cannot switch to unregistered state '{state_name}'.")
                  pygame.quit()
                  sys.exit(1)
         
-        def handle_event(self, event):
-            if self.active_state:
-                self.active_state.handle_event(event)
-                
-        def update(self, dt):
-             if self.active_state:
-                next_state_name = self.active_state.update(dt) # Pass dt
-                if next_state_name and next_state_name != self.active_state_name:
-                    self.change_state(next_state_name)
-        
-        def draw(self):
-            if self.active_state:
-                self.active_state.draw()
-                
-        def handle_resize(self):
-            if self.active_state:
-                 if hasattr(self.active_state, 'handle_resize'):
-                     self.active_state.handle_resize()
-                 else: # Default recreate state if no specific handler
-                      print(f"Recreating state {self.active_state_name} after resize.")
-                      try:
-                           current_args = getattr(self.active_state, '_init_args', ()) 
-                           current_kwargs = getattr(self.active_state, '_init_kwargs', {})
-                           self.active_state = self.states[self.active_state_name](self.screen, self, *current_args, **current_kwargs)
-                      except Exception as e:
-                           print(f"Error recreating state after resize: {e}. Falling back to main menu.")
-                           if 'main_menu' in self.states:
-                               self.change_state('main_menu')
-                           else: 
-                                print("Error: Main menu state not found.")
-                                pygame.quit()
-                                sys.exit(1)
-                                
-        def get_current_state_instance(self):
-            return self.active_state
+    def handle_event(self, event):
+        if self.active_state:
+            # Pass event to the active state's handle_event method
+            handled = self.active_state.handle_event(event)
+            # Optionally return the result if states need to signal handling
+            # return handled 
+            
+    def update(self, dt):
+        if self.active_state:
+            # Call the active state's update method
+            next_state_name = self.active_state.update(dt) 
+            # If the update method returned a state name, change state
+            if next_state_name and isinstance(next_state_name, str) and next_state_name != self.active_state_name:
+                self.change_state(next_state_name)
+    
+    def draw(self):
+        if self.active_state:
+            # Call the active state's draw method
+            self.active_state.draw()
+            
+    def handle_resize(self):
+        if self.active_state:
+            # Check if the active state has its own resize handler
+            if hasattr(self.active_state, 'handle_resize'):
+                self.active_state.handle_resize()
+            else: 
+                # Default behavior: try to recreate the state
+                print(f"Recreating state {self.active_state_name} after resize (default behavior).")
+                try:
+                    # Attempt to get constructor args if stored (requires states to store them)
+                    current_args = getattr(self.active_state, '_init_args', ()) 
+                    current_kwargs = getattr(self.active_state, '_init_kwargs', {})
+                    # Recreate the state instance
+                    self.active_state = self.states[self.active_state_name](self.screen, self, *current_args, **current_kwargs)
+                except Exception as e:
+                    # Fallback if recreation fails
+                    print(f"Error recreating state after resize: {e}. Falling back to main menu.")
+                    if 'main_menu' in self.states:
+                        self.change_state('main_menu')
+                    else: 
+                        # Critical error if main menu state is missing
+                        print("Error: Main menu state not found. Cannot recover from resize error.")
+                        pygame.quit()
+                        sys.exit(1)
+                            
+    def get_current_state_instance(self):
+        # Return the currently active state object
+        return self.active_state
 
 def main():
     # Initialize pygame
