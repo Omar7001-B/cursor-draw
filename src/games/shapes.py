@@ -1,5 +1,7 @@
 import pygame
 import math
+import random
+import time
 from typing import List, Tuple, Dict, Any, Optional
 from src.config import Config
 from src.core.whiteboard import Whiteboard
@@ -17,6 +19,24 @@ class DrawBasicShapes:
         self.next_screen = None
         self.active_dialog = None
         
+        # Difficulty settings - tolerance for accuracy (higher = easier)
+        self.difficulty_settings = {
+            "Easy": 20,       # 20px tolerance - most forgiving
+            "Medium": 15,     # 15px tolerance - balanced
+            "Hard": 10        # 10px tolerance - most challenging
+        }
+        self.current_difficulty = "Medium"  # Default to medium difficulty
+        
+        # Tutorial animation state
+        self.tutorial_active = False
+        self.tutorial_progress = 0
+        self.tutorial_start_time = 0
+        self.tutorial_duration = 3000  # 3 seconds to complete animation
+        self.tutorial_dot_radius = 8
+        self.tutorial_dot_color = (255, 0, 0)  # Red dot
+        self.tutorial_trail = []
+        self.tutorial_trail_max_length = 20
+        
         # Set up shape tracing state
         self.shapes_data = [
             {"name": "Circle", "type": "circle", "difficulty": 1},
@@ -24,6 +44,8 @@ class DrawBasicShapes:
             {"name": "Triangle", "type": "triangle", "difficulty": 1},
             {"name": "Rectangle", "type": "rectangle", "difficulty": 2},
             {"name": "Diamond", "type": "diamond", "difficulty": 2},
+            {"name": "Hexagon", "type": "hexagon", "difficulty": 2},
+            {"name": "Star", "type": "star", "difficulty": 3},
             # More shapes can be added here with increasing difficulty
         ]
         
@@ -97,11 +119,63 @@ class DrawBasicShapes:
             centered=True
         )
         
+        # Set up difficulty selector in the top-right corner
+        difficulty_panel_width = Config.scale_width(300)
+        difficulty_panel_height = Config.scale_height(40)
+        difficulty_panel_x = screen_width - difficulty_panel_width - Config.scale_width(20)
+        difficulty_panel_y = Config.scale_height(10)
+        
+        self.difficulty_label = Label(
+            difficulty_panel_x,
+            difficulty_panel_y,
+            "Difficulty:",
+            font_size=scaled_font_sizes['small'],
+            centered=False
+        )
+        
+        # Create difficulty buttons
+        diff_button_width = Config.scale_width(70)
+        diff_button_height = Config.scale_height(30)
+        diff_button_y = difficulty_panel_y + Config.scale_height(5)
+        
+        diff_colors = {
+            "Easy": Config.GREEN,
+            "Medium": (255, 165, 0),  # Orange
+            "Hard": Config.RED
+        }
+        
+        self.difficulty_buttons = {}
+        for i, diff in enumerate(["Easy", "Medium", "Hard"]):
+            x_pos = difficulty_panel_x + Config.scale_width(80) + (diff_button_width + Config.scale_width(10)) * i
+            
+            # Check if this is the current difficulty
+            is_selected = (diff == self.current_difficulty)
+            bg_color = diff_colors[diff]
+            # Make unselected buttons more muted
+            if not is_selected:
+                # Create a more muted version of the color
+                bg_color = tuple(min(255, c + 70) for c in bg_color)
+            
+            button = Button(
+                x_pos,
+                diff_button_y,
+                diff_button_width,
+                diff_button_height,
+                diff,
+                lambda d=diff: self._set_difficulty(d),
+                bg_color=bg_color,
+                hover_color=diff_colors[diff],
+                text_color=Config.WHITE,
+                rounded=True,
+                font_size=scaled_font_sizes['small']
+            )
+            self.difficulty_buttons[diff] = button
+        
         # Calculate button positions with proper spacing to avoid overlap
         # Use a more professional layout with even margins
         button_margin = Config.scale_width(20)
-        button_width = scaled_button_width * 0.85  # Slightly smaller buttons to fit 4 of them
-        button_spacing = (whiteboard_width - 4 * button_width - 2 * button_margin) / 3
+        button_width = scaled_button_width * 0.85  # Slightly smaller buttons to fit 5 of them
+        button_spacing = (whiteboard_width - 5 * button_width - 2 * button_margin) / 4
         button_y = screen_height - Config.scale_height(45)  # Move up slightly
         
         # Back to Menu button - leftmost
@@ -119,8 +193,24 @@ class DrawBasicShapes:
             font_size=scaled_font_sizes['small']
         )
         
-        # Clear button - second from left
-        clear_x = whiteboard_x + button_margin + button_width + button_spacing
+        # Tutorial button - second from left
+        tutorial_x = whiteboard_x + button_margin + button_width + button_spacing
+        self.tutorial_button = Button(
+            tutorial_x,
+            button_y,
+            button_width,
+            scaled_button_height,
+            "Tutorial",
+            self._start_tutorial,
+            bg_color=(150, 100, 255),  # Purple
+            hover_color=(170, 130, 255),
+            text_color=Config.WHITE,
+            rounded=True,
+            font_size=scaled_font_sizes['small']
+        )
+        
+        # Clear button - third from left
+        clear_x = tutorial_x + button_width + button_spacing
         self.clear_button = Button(
             clear_x,
             button_y,
@@ -135,7 +225,7 @@ class DrawBasicShapes:
             font_size=scaled_font_sizes['small']
         )
         
-        # Random Shape button - third from left
+        # Random Shape button - fourth from left
         random_x = clear_x + button_width + button_spacing
         self.random_shape_button = Button(
             random_x,
@@ -177,6 +267,42 @@ class DrawBasicShapes:
             accuracy_panel_width,
             Config.scale_height(320)  # Slightly taller for more information
         )
+        
+    def _set_difficulty(self, difficulty):
+        """Change the current difficulty level"""
+        if difficulty in self.difficulty_settings:
+            self.current_difficulty = difficulty
+            
+            # Update button appearances
+            diff_colors = {
+                "Easy": Config.GREEN,
+                "Medium": (255, 165, 0),  # Orange
+                "Hard": Config.RED
+            }
+            
+            for diff, button in self.difficulty_buttons.items():
+                if diff == difficulty:
+                    button.bg_color = diff_colors[diff]
+                else:
+                    # Create a more muted version of the color
+                    button.bg_color = tuple(min(255, c + 70) for c in diff_colors[diff])
+            
+            # Reset the current shape to apply new difficulty
+            self._generate_current_shape()
+            
+            # Show feedback to the user
+            def close_dialog():
+                self.active_dialog = None
+                
+            self.active_dialog = Dialog(
+                self.screen,
+                f"Difficulty set to {difficulty}.\n" +
+                f"Tolerance: {self.difficulty_settings[difficulty]}px",
+                close_dialog,
+                None,
+                title="Difficulty Changed",
+                confirm_text="OK"
+            )
         
     def _generate_current_shape(self):
         """Generate the current shape based on the index"""
@@ -323,11 +449,13 @@ class DrawBasicShapes:
             # Not enough data to evaluate
             return
         
-        # Calculate accuracy
+        # Calculate accuracy with difficulty-based tolerance
+        tolerance = self.difficulty_settings[self.current_difficulty]
+        
         metrics = PathDetection.calculate_tracing_accuracy(
             self.drawn_points,
             self.current_shape_points,
-            tolerance=15  # Pixel tolerance for "on path"
+            tolerance=tolerance  # Use difficulty-based tolerance
         )
         
         # Update accuracy tracker
@@ -350,6 +478,7 @@ class DrawBasicShapes:
                     self.screen,
                     f"Great job! You completed the {self.shapes_data[self.current_shape_index]['name']}.\n" +
                     f"Accuracy: {metrics['percentage']:.1f}%\n" +
+                    f"Difficulty: {self.current_difficulty}\n" +
                     "Moving to next shape in 3 seconds...",
                     close_dialog,
                     None,
@@ -360,6 +489,105 @@ class DrawBasicShapes:
     # Modify the real-time accuracy evaluation to reduce frequency
     point_count = 0
     last_evaluation_time = 0
+    
+    def _start_tutorial(self):
+        """Start the tutorial animation showing how to trace the shape"""
+        # Only start if a tutorial is not already active
+        if not self.tutorial_active and not self.is_tracing:
+            # Clear the drawing first
+            self._clear_drawing()
+            
+            # Set tutorial state
+            self.tutorial_active = True
+            self.tutorial_progress = 0
+            self.tutorial_start_time = pygame.time.get_ticks()
+            self.tutorial_trail = []
+            
+            # Show a message to the user
+            def close_dialog():
+                self.active_dialog = None
+                
+            self.active_dialog = Dialog(
+                self.screen,
+                "Tutorial mode activated.\nWatch the red dot to learn\nhow to trace this shape.",
+                close_dialog,
+                None,
+                title="Tutorial",
+                confirm_text="OK"
+            )
+    
+    def _update_tutorial_animation(self):
+        """Update the tutorial animation state"""
+        if not self.tutorial_active:
+            return
+            
+        # Calculate progress (0.0 to 1.0)
+        current_time = pygame.time.get_ticks()
+        elapsed = current_time - self.tutorial_start_time
+        
+        if elapsed >= self.tutorial_duration:
+            # Tutorial completed
+            self.tutorial_active = False
+            return
+            
+        # Get normalized progress (0.0 to 1.0)
+        self.tutorial_progress = min(1.0, elapsed / self.tutorial_duration)
+        
+        # Calculate the position on the shape based on progress
+        if not self.current_shape_points:
+            return
+            
+        # Interpolate position along the shape path
+        num_points = len(self.current_shape_points)
+        if num_points <= 1:
+            return
+            
+        # For closed shapes, we need to complete the loop
+        # by considering the first point again at the end
+        index_float = self.tutorial_progress * num_points
+        index1 = int(index_float) % num_points
+        index2 = (index1 + 1) % num_points
+        
+        t = index_float - int(index_float)  # Fractional part for interpolation
+        
+        p1 = self.current_shape_points[index1]
+        p2 = self.current_shape_points[index2]
+        
+        # Linear interpolation between points
+        x = p1[0] + (p2[0] - p1[0]) * t
+        y = p1[1] + (p2[1] - p1[1]) * t
+        
+        current_pos = (int(x), int(y))
+        
+        # Add to trail with a max length
+        self.tutorial_trail.append(current_pos)
+        if len(self.tutorial_trail) > self.tutorial_trail_max_length:
+            self.tutorial_trail = self.tutorial_trail[-self.tutorial_trail_max_length:]
+    
+    def _draw_tutorial_animation(self):
+        """Draw the tutorial animation on the whiteboard"""
+        if not self.tutorial_active or not self.tutorial_trail:
+            return
+            
+        # Create a temporary surface for the trail
+        temp_surface = pygame.Surface(self.whiteboard.size, pygame.SRCALPHA)
+        
+        # Draw the trail with fading opacity
+        for i, pos in enumerate(self.tutorial_trail):
+            # Calculate opacity based on position in trail (newer points are more opaque)
+            alpha = int(255 * (i + 1) / len(self.tutorial_trail))
+            radius = int(self.tutorial_dot_radius * (0.5 + 0.5 * (i + 1) / len(self.tutorial_trail)))
+            
+            # Draw with alpha
+            pygame.draw.circle(temp_surface, (*self.tutorial_dot_color, alpha), pos, radius)
+        
+        # Draw the current position (full opacity)
+        if self.tutorial_trail:
+            pygame.draw.circle(temp_surface, self.tutorial_dot_color, self.tutorial_trail[-1], 
+                              self.tutorial_dot_radius)
+        
+        # Blit the tutorial animation onto the whiteboard surface
+        self.whiteboard.drawing_engine.surface.blit(temp_surface, (0, 0))
     
     def handle_event(self, event):
         """Handle pygame events"""
@@ -378,14 +606,31 @@ class DrawBasicShapes:
         # Handle button events
         if event.type == pygame.MOUSEMOTION:
             self.menu_button.update(event.pos)
+            self.tutorial_button.update(event.pos)
             self.clear_button.update(event.pos)
             self.next_shape_button.update(event.pos)
             self.random_shape_button.update(event.pos)
             
+            # Update difficulty buttons
+            for button in self.difficulty_buttons.values():
+                button.update(event.pos)
+            
         self.menu_button.handle_event(event)
+        self.tutorial_button.handle_event(event)
         self.clear_button.handle_event(event)
         self.next_shape_button.handle_event(event)
         self.random_shape_button.handle_event(event)
+        
+        # Handle difficulty button events
+        for button in self.difficulty_buttons.values():
+            button.handle_event(event)
+        
+        # Don't allow drawing during tutorial
+        if self.tutorial_active:
+            # Cancel tutorial on any click
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.tutorial_active = False
+            return
         
         # Handle drawing events
         canvas_rect = pygame.Rect(
@@ -440,13 +685,22 @@ class DrawBasicShapes:
         # Update UI buttons
         if mouse_pos:
             self.menu_button.update(mouse_pos)
+            self.tutorial_button.update(mouse_pos)
             self.clear_button.update(mouse_pos)
             self.next_shape_button.update(mouse_pos)
             self.random_shape_button.update(mouse_pos)
             
+            # Update difficulty buttons
+            for button in self.difficulty_buttons.values():
+                button.update(mouse_pos)
+            
         # Update dialog if active
         if self.active_dialog and mouse_pos:
             self.active_dialog.update(mouse_pos)
+            
+        # Update tutorial animation
+        if self.tutorial_active:
+            self._update_tutorial_animation()
             
         # Check for auto-progression timer
         if self.auto_progress_timer and pygame.time.get_ticks() > self.auto_progress_timer:
@@ -475,6 +729,11 @@ class DrawBasicShapes:
         self.title_label.draw(self.screen)
         self.title_label.color = title_color_original
         
+        # Draw difficulty selector
+        self.difficulty_label.draw(self.screen)
+        for button in self.difficulty_buttons.values():
+            button.draw(self.screen)
+        
         # Draw shape label
         self.shape_label.draw(self.screen)
         
@@ -484,8 +743,9 @@ class DrawBasicShapes:
         # Draw whiteboard
         self.whiteboard.render()
         
-        # We no longer need to draw the shape outline here as it's drawn
-        # directly on the whiteboard surface when generated or cleared
+        # Draw tutorial animation if active
+        if self.tutorial_active:
+            self._draw_tutorial_animation()
         
         # Draw accuracy panel
         self.accuracy_tracker.draw_accuracy_panel(
@@ -497,6 +757,7 @@ class DrawBasicShapes:
         
         # Draw buttons
         self.menu_button.draw(self.screen)
+        self.tutorial_button.draw(self.screen)
         self.clear_button.draw(self.screen)
         self.random_shape_button.draw(self.screen)
         self.next_shape_button.draw(self.screen)
