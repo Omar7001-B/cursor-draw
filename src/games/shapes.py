@@ -595,8 +595,8 @@ class DrawBasicShapes(GameState):
         # Draw instruction label
         self.instruction_label.draw(self.screen)
         
-        # Draw whiteboard
-        self.whiteboard.draw()
+        # Draw whiteboard using its render method
+        self.whiteboard.render()
         
         # Draw accuracy panel
         self.accuracy_tracker.draw_accuracy_panel(
