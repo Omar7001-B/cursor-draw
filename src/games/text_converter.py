@@ -171,7 +171,9 @@ class TextConverterGame(GameState):
 
     def clear_whiteboard_and_text(self):
         """Clears the whiteboard drawing and the recognized text."""
-        self.whiteboard.clear_canvas() # Ask the whiteboard component to clear itself
+        # Directly clear the drawing engine's surface and history
+        # Avoids the confirmation dialog in Whiteboard.clear_canvas
+        self.whiteboard.drawing_engine.clear_canvas(animated=False) # Use False for immediate clear
         self.recognized_text = "" # Clear the text display
         self.processing = False # Ensure processing stops if clear is hit mid-process
 
