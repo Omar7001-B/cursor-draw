@@ -9,6 +9,9 @@ class PathDetection:
     against a target path or shape.
     """
     
+    # Add a cache to avoid repeated calculations
+    _distance_cache = {}
+    
     @staticmethod
     def calculate_distance_to_shape(point: Tuple[int, int], shape_points: List[Tuple[int, int]]) -> float:
         """
@@ -23,18 +26,32 @@ class PathDetection:
         """
         if not shape_points:
             return float('inf')
+        
+        # Check if this calculation has been cached
+        cache_key = (point, tuple(shape_points))
+        if cache_key in PathDetection._distance_cache:
+            return PathDetection._distance_cache[cache_key]
             
         # Find the minimum distance to any line segment in the shape
         min_distance = float('inf')
         
-        for i in range(len(shape_points)):
+        # Optimize by sampling shape points if there are many
+        stride = max(1, len(shape_points) // 20)  # Sample at most 20 segments for performance
+        indices = range(0, len(shape_points), stride)
+        
+        for i in indices:
             # Get the current line segment
             p1 = shape_points[i]
-            p2 = shape_points[(i + 1) % len(shape_points)]  # Wrap around to the first point
+            p2 = shape_points[(i + stride) % len(shape_points)]  # Wrap around to the first point
             
             # Calculate distance from point to line segment
             dist = PathDetection._distance_point_to_line_segment(point, p1, p2)
             min_distance = min(min_distance, dist)
+        
+        # Store in cache for future use (limit cache size)
+        if len(PathDetection._distance_cache) > 1000:
+            PathDetection._distance_cache.clear()  # Avoid memory issues by clearing cache if too large
+        PathDetection._distance_cache[cache_key] = min_distance
             
         return min_distance
     
@@ -52,26 +69,34 @@ class PathDetection:
         Returns:
             The distance from the point to the line segment
         """
-        # Convert to numpy arrays for vector operations
-        p = np.array(point)
-        a = np.array(line_start)
-        b = np.array(line_end)
+        # Faster implementation using direct calculations rather than numpy operations
+        x, y = point
+        x1, y1 = line_start
+        x2, y2 = line_end
         
         # Calculate the squared length of the line segment
-        len_sq = np.sum((b - a) ** 2)
+        dx = x2 - x1
+        dy = y2 - y1
+        len_sq = dx*dx + dy*dy
         
         # Handle degenerate case (point or extremely short segment)
         if len_sq < 1e-6:
-            return np.linalg.norm(p - a)
+            # Distance to a point
+            dx1 = x - x1
+            dy1 = y - y1
+            return math.sqrt(dx1*dx1 + dy1*dy1)
             
-        # Calculate the projection of the point onto the line
-        t = max(0, min(1, np.sum((p - a) * (b - a)) / len_sq))
+        # Calculate the projection position
+        t = max(0, min(1, ((x - x1) * dx + (y - y1) * dy) / len_sq))
         
         # Calculate the closest point on the line segment
-        projection = a + t * (b - a)
+        proj_x = x1 + t * dx
+        proj_y = y1 + t * dy
         
         # Return the distance to the projection
-        return np.linalg.norm(p - projection)
+        dx = x - proj_x
+        dy = y - proj_y
+        return math.sqrt(dx*dx + dy*dy)
     
     @staticmethod
     def calculate_tracing_accuracy(drawn_path: List[Tuple[int, int]], 
@@ -102,14 +127,26 @@ class PathDetection:
                 "max_distance": float('inf')
             }
         
+        # Optimize by sampling drawn points if there are too many
+        # For real-time feedback, we don't need to process every point
+        sample_drawn_path = drawn_path
+        if len(drawn_path) > 50:  # If more than 50 points, sample
+            stride = len(drawn_path) // 50 + 1
+            sample_drawn_path = drawn_path[::stride]
+            
+        # Cache target_path as tuple for using in distance calculations
+        target_path_tuple = tuple(target_path)
+        
         # Calculate distances from each drawn point to the target path
         distances = []
         on_path_count = 0
         max_distance = 0
         
-        for point in drawn_path:
+        distance_sum = 0
+        
+        for point in sample_drawn_path:
             dist = PathDetection.calculate_distance_to_shape(point, target_path)
-            distances.append(dist)
+            distance_sum += dist
             
             if dist <= tolerance:
                 on_path_count += 1
@@ -117,9 +154,15 @@ class PathDetection:
             max_distance = max(max_distance, dist)
         
         # Calculate metrics
+        sample_total = len(sample_drawn_path)
         total_points = len(drawn_path)
+        # Scale up the counts based on the sampling
+        if sample_total < total_points:
+            scale_factor = total_points / sample_total
+            on_path_count = int(on_path_count * scale_factor)
+            
         accuracy_percentage = (on_path_count / total_points) * 100 if total_points > 0 else 0
-        avg_distance = sum(distances) / len(distances) if distances else float('inf')
+        avg_distance = distance_sum / sample_total if sample_total > 0 else float('inf')
         
         return {
             "percentage": accuracy_percentage,
