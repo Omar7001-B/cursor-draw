@@ -7,15 +7,15 @@ import io
 from src.core.game_state import GameState
 from src.core.whiteboard import Whiteboard
 from src.core.ui_manager import Button
-from src.config import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, BLACK, GRAY
+from src.config import Config
 
 class TextConverterGame(GameState):
     def __init__(self, screen, game_manager):
         super().__init__(screen, game_manager)
-        self.whiteboard = Whiteboard(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 150, show_controls=False)
+        self.whiteboard = Whiteboard(0, 50, Config.SCREEN_WIDTH, Config.SCREEN_HEIGHT - 150, show_controls=False)
         self.recognized_text = ""
-        self.text_display_rect = pygame.Rect(10, SCREEN_HEIGHT - 90, SCREEN_WIDTH - 120, 80)
-        self.copy_button = Button(SCREEN_WIDTH - 110, SCREEN_HEIGHT - 70, 100, 40, "Copy", self.copy_text)
+        self.text_display_rect = pygame.Rect(10, Config.SCREEN_HEIGHT - 90, Config.SCREEN_WIDTH - 120, 80)
+        self.copy_button = Button(Config.SCREEN_WIDTH - 110, Config.SCREEN_HEIGHT - 70, 100, 40, "Copy", self.copy_text)
         self.back_button = Button(10, 10, 100, 30, "Back", self.go_back)
         self.font = pygame.font.Font(None, 24)
         self.large_font = pygame.font.Font(None, 32)
@@ -45,22 +45,22 @@ class TextConverterGame(GameState):
         self.back_button.update(dt)
 
     def draw(self):
-        self.screen.fill(WHITE)
+        self.screen.fill(Config.WHITE)
         self.whiteboard.draw()
 
         # Draw text display area
-        pygame.draw.rect(self.screen, GRAY, self.text_display_rect, 2, border_radius=5)
-        text_surface = self.font.render(self.recognized_text, True, BLACK)
+        pygame.draw.rect(self.screen, Config.GRAY, self.text_display_rect, 2, border_radius=5)
+        text_surface = self.font.render(self.recognized_text, True, Config.BLACK)
         text_rect = text_surface.get_rect(topleft=(self.text_display_rect.x + 10, self.text_display_rect.y + 10))
         self.screen.blit(text_surface, text_rect)
 
         # Draw Header
-        header_surface = self.large_font.render("Whiteboard to Text", True, BLACK)
-        self.screen.blit(header_surface, (SCREEN_WIDTH // 2 - header_surface.get_width() // 2, 10))
+        header_surface = self.large_font.render("Whiteboard to Text", True, Config.BLACK)
+        self.screen.blit(header_surface, (Config.SCREEN_WIDTH // 2 - header_surface.get_width() // 2, 10))
 
         # Draw Instruction
-        instruction_surface = self.font.render("Draw text on the whiteboard. Release mouse to recognize.", True, BLACK)
-        self.screen.blit(instruction_surface, (10, SCREEN_HEIGHT - 115))
+        instruction_surface = self.font.render("Draw text on the whiteboard. Release mouse to recognize.", True, Config.BLACK)
+        self.screen.blit(instruction_surface, (10, Config.SCREEN_HEIGHT - 115))
 
         self.copy_button.draw(self.screen)
         self.back_button.draw(self.screen)
