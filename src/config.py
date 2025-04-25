@@ -42,10 +42,10 @@ class Config:
         "Whiteboard Playground",
         "Draw Basic Shapes",
         "Trace the Letter",
-        "Trace the Number"
+        "Trace the Number",
+        "Trace the Sentence"
     ]
     COMING_SOON_GAMES = [
-        "Trace the Sentence",
         "Whiteboard to Text"
     ]
     
