@@ -23,12 +23,15 @@ def main():
     available_height = screen_info.current_h
     
     # Adjust initial window size if necessary to fit screen
-    window_width = min(Config.SCREEN_WIDTH, available_width - 50)  # Leave some margin
-    window_height = min(Config.SCREEN_HEIGHT, available_height - 50)  # Leave some margin for window controls
+    window_width = min(Config.SCREEN_WIDTH, available_width - 150)  # Increase margin further
+    window_height = min(Config.SCREEN_HEIGHT, available_height - 150)  # Increase margin further
     
     # Update Config to reflect the adjusted size
     Config.SCREEN_WIDTH = window_width
     Config.SCREEN_HEIGHT = window_height
+    
+    # Center the window on the screen
+    os.environ['SDL_VIDEO_CENTERED'] = '1'  # Center the window instead of specifying position
     
     # Set up the game window with resizable flag
     screen = pygame.display.set_mode(
@@ -36,6 +39,19 @@ def main():
         pygame.RESIZABLE
     )
     pygame.display.set_caption("CursorDraw")
+    
+    # Additional initialization to ensure window decorations are visible
+    # Forcing a small initial resize helps on some systems
+    screen = pygame.display.set_mode(
+        (window_width - 1, window_height - 1),
+        pygame.RESIZABLE
+    )
+    
+    # Then set it back to intended size
+    screen = pygame.display.set_mode(
+        (window_width, window_height),
+        pygame.RESIZABLE
+    )
     
     # Initialize clock for controlling frame rate
     clock = pygame.time.Clock()
@@ -58,8 +74,8 @@ def main():
                 width, height = event.size
                 
                 # Ensure the window doesn't exceed screen boundaries
-                width = min(width, available_width - 50)
-                height = min(height, available_height - 50)
+                width = min(width, available_width - 150)
+                height = min(height, available_height - 150)
                 
                 # Update the Config values to reflect the new size
                 Config.SCREEN_WIDTH = width
